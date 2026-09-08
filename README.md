@@ -111,34 +111,39 @@ are pink**, **the background writer is teal**, **replication is orange**,
 
 ## More things to try
 
-- Press **`T`** for the 14-chapter guided tour. It follows one connection from
-  the client through planning, caching, WAL, checkpoints, vacuum and replication.
-- Press **`Enter`** to trace one statement. Pick **Non-HOT UPDATE** and slow
-  playback exposes where it enters the buffer pool, creates WAL and waits to
-  commit.
-- Run **Cache thrash** from the Scenarios menu. It sets `shared_buffers` to
-  16 MiB — below the manual control's 128 MiB minimum — so the clock sweep races
-  and backends write their own dirty victims before they can read another page.
-- Run **The work_mem cliff**. Its fixed Sort and HashAggregate nodes spill at
-  2 MiB, then fit at 4 MiB without replanning; the private reservoirs,
-  `base/pgsql_tmp`, temp counters and latency breakdown show the consequence.
-- Turn on **Long-running transaction**. The xmin horizon blade sinks and goes
-  red; autovacuum still travels to the tables, but reports zero removable rows
-  while the `sessions` table keeps bloating. Release the transaction and cleanup
-  can begin again.
-- Run **Checkpoint storm**. Watch the checkpointer's flywheel spin up, the fsync
-  phase shudder, and a wall of full-page writes flood the WAL district after
-  each checkpoint begins.
-- Set **`synchronous_commit`** to `off` and watch backends stop waiting in
-  `commit_wait`. Then read what you just traded away.
-- Turn on **Slow replay** and watch `sent_lsn`, `write_lsn`, `flush_lsn` and
-  `replay_lsn` pull apart on the standby.
-- Press **`G`** and walk through the city at eye level. A buffer frame that read
+- Press **`T`** for the guided tour. It follows one I/O request from a host
+  submission queue through the FTL into NAND, and shows what garbage collection
+  does to the flows sharing the device.
+- Press **`Enter`** to trace one request. Pick **Random write** and slow
+  playback exposes the seven end-to-end stages: enqueue, PCIe, FTL, cache,
+  flash, ONFI and the completion path.
+- Run **Cache thrash** from the Scenarios menu. It drops the device DRAM data
+  cache to 16 MiB under a deep-queue writer: evictions fire before destaging
+  completes, flash write traffic multiplies, and the low-intensity flow sharing
+  the cache pays for it.
+- Run **Checkpoint storm**. It shrinks the overprovisioning reserve so the
+  free-page pool falls through the GC threshold within seconds; watch valid-page
+  copies and erases stall user reads on the same die.
+- Run **The CMT cliff**. A random flow's mapping misses evict a sequential
+  flow's translation entries; watch the CMT hit ratio fall and mapping reads
+  stretch the sequential flow's latency.
+- Turn off **Preemptible GC** and watch erases run to completion while user
+  reads queue behind them — then switch it back and watch suspension/resume.
+- Set **Data cache** high and **Random share** low and watch the write cache
+  absorb nearly every write; then push the mix random and watch destage
+  pressure climb.
+- Turn on **Long-running transaction** to pin the host-side write set: the FTL
+  keeps allocating fresh pages for rewritten LPAs and the free-page pool sinks
+  faster. Release it and GC has stable victims to reclaim.
+- Set **`synchronous_commit`** to `off` and watch backends stop waiting for the
+  host-side durability point. Then read what you just traded away.
+- Turn on **Slow replay** and watch one flow's queue depth pull away from the
+  other's while the device serves both.
+- Press **`G`** and walk through the city at eye level. A NAND block that read
   as one tile from the establishing shot becomes a structure above your head.
-  Press **`E`** at the autovacuum lever or the postmaster door to operate it;
-  the control center inside can trace one of six statements across a map of the city.
 - Try an operator scenario, wait for its decision, and choose a response. Slot
-  pressure, failover, and recovery make the consequence visible and offer a safe reset.
+  pressure and the vacuum-blockade analog make the consequence visible and
+  offer a safe reset.
 
 ---
 

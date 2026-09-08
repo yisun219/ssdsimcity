@@ -602,17 +602,6 @@ export const KNOB_META: KnobMeta[] = [
     hint: 'Share of accesses drawn uniformly across the address space. Random traffic murders the CMT hit rate; skewed traffic spares it.',
   },
   {
-    key: 'writeRatio',
-    label: 'Write percentage',
-    group: 'workload',
-    kind: 'range',
-    min: 0,
-    max: 1,
-    step: 0.05,
-    unit: 'of ops',
-    hint: 'Share of requests that write. Writes fill the device cache, destage to flash, and create the garbage GC must clean.',
-  },
-  {
     key: 'queueFetchSize',
     label: 'QueueFetchSize',
     guc: 'NVMe QueueFetchSize',
