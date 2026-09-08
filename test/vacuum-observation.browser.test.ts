@@ -4,7 +4,7 @@ import { inspectRenderedPages } from './disclosure-browser.mjs'
 it('traverses real checkpoints with keyboard control and retained notes', async () => {
   const reports = await inspectRenderedPages([{ name: 'City', path: '/', readySelector: '.hud-investigate', reducedMotion: true }], async ({ evaluate, send }) => {
     await evaluate(`(async () => {
-      for(let i=0; i<200 && !window.PGSIMCITY; i++) await new Promise(r=>setTimeout(r,50))
+      for(let i=0; i<200 && !window.SSDSIMCITY; i++) await new Promise(r=>setTimeout(r,50))
       document.querySelector('.hud-investigate').click()
       document.querySelector('#vacuum-personal-notes').value = 'Keep this evidence'
       document.querySelector('[data-vacuum-seek]').focus()
@@ -26,7 +26,7 @@ it('traverses real checkpoints with keyboard control and retained notes', async 
       click('[data-vacuum-seek]')
       await wait(()=>document.querySelector('[data-checkpoint="collected"]'))
       click('[data-vacuum-verify]')
-      return {phase:document.querySelector('.vacuum-lesson').dataset.phase, kinds:[...document.querySelectorAll('[data-checkpoint]')].map(b=>b.dataset.checkpoint), pinnedRetained:pinned===document.querySelector('[data-checkpoint="pinned"]').textContent, eligible, notes:document.querySelector('#vacuum-personal-notes').value, paused:PGSIMCITY.sim.state.knobs.paused}
+      return {phase:document.querySelector('.vacuum-lesson').dataset.phase, kinds:[...document.querySelectorAll('[data-checkpoint]')].map(b=>b.dataset.checkpoint), pinnedRetained:pinned===document.querySelector('[data-checkpoint="pinned"]').textContent, eligible, notes:document.querySelector('#vacuum-personal-notes').value, paused:SSDSIMCITY.sim.state.knobs.paused}
     })()`)
   })
   expect(reports[0].phase).toBe('complete')

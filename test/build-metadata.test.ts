@@ -21,7 +21,7 @@ describe('build marker', () => {
       const html = await server.transformIndexHtml('/', read('index.html'))
       expect(html.match(/<p class="boot-version"[^>]*>([^<]+)<\/p>/)?.[1])
         .toBe(BUILD_LABEL)
-      expect(html).not.toContain('%PGSIMCITY_BUILD_LABEL%')
+      expect(html).not.toContain('%SSDSIMCITY_BUILD_LABEL%')
     } finally {
       await server.close()
     }

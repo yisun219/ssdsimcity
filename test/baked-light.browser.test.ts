@@ -5,9 +5,9 @@ it('installs the shipped bake on the actual city across quality changes', async 
   const [states] = await inspectRenderedPages([{
     name: 'City baked lighting', path: '/', readySelector: '.hud-theme', reducedMotion: true,
   }], async ({ evaluate }) => evaluate(`(async () => {
-    for (let i = 0; i < 200 && !window.PGSIMCITY; i++) await new Promise(resolve => setTimeout(resolve, 50))
-    if (!window.PGSIMCITY) throw new Error('City debugging surface not ready')
-    const p = window.PGSIMCITY
+    for (let i = 0; i < 200 && !window.SSDSIMCITY; i++) await new Promise(resolve => setTimeout(resolve, 50))
+    if (!window.SSDSIMCITY) throw new Error('City debugging surface not ready')
+    const p = window.SSDSIMCITY
     await new Promise(resolve => requestAnimationFrame(resolve))
     const render = p.gfx.render.bind(p.gfx)
     p.gfx.render = dt => render(dt, 1 / 60)

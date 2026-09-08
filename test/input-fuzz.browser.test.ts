@@ -205,12 +205,12 @@ describe('seeded real-browser input sequences', () => {
       readySelector: '#canvas-root canvas',
       beforeLoad: PRELOAD,
       prepare: `(async () => {
-        for (let attempt = 0; attempt < 240 && !window.PGSIMCITY; attempt += 1) {
+        for (let attempt = 0; attempt < 240 && !window.SSDSIMCITY; attempt += 1) {
           await new Promise((resolve) => setTimeout(resolve, 250))
         }
-        if (!window.PGSIMCITY) throw new Error('PGSimCity did not expose its browser handle')
-        window.PGSIMCITY.sim.setKnob('paused', true)
-        window.PGSIMCITY.bus.emit('quality', { level: 'low' })
+        if (!window.SSDSIMCITY) throw new Error('PGSimCity did not expose its browser handle')
+        window.SSDSIMCITY.sim.setKnob('paused', true)
+        window.SSDSIMCITY.bus.emit('quality', { level: 'low' })
       })()`,
     }], async ({ evaluate, send }) => {
       const moduleCall = (body: string) => evaluate(`(async () => {
@@ -218,13 +218,13 @@ describe('seeded real-browser input sequences', () => {
         ${body}
       })()`)
       const inspect = (full = false) => moduleCall(
-        `return fuzz.inspectInputState(window.PGSIMCITY, ${full})`,
+        `return fuzz.inspectInputState(window.SSDSIMCITY, ${full})`,
       ) as Promise<InputFinding[]>
       const reset = () => moduleCall(
-        `return fuzz.resetInputState(window.PGSIMCITY)`,
+        `return fuzz.resetInputState(window.SSDSIMCITY)`,
       ) as Promise<InputFinding[]>
       const perform = (action: InputAction, full = false) => moduleCall(
-        `return fuzz.performInputAction(window.PGSIMCITY, ${JSON.stringify(action)}, ${full})`,
+        `return fuzz.performInputAction(window.SSDSIMCITY, ${JSON.stringify(action)}, ${full})`,
       ) as Promise<InputFinding[]>
       const frameCount = () => moduleCall('return fuzz.frameLoopCount()') as Promise<number>
       const blurCount = () => moduleCall('return fuzz.blurCount()') as Promise<number>
@@ -335,7 +335,7 @@ describe('seeded real-browser input sequences', () => {
           }
         }
         if (findings.length === 0) {
-          const recovery = await moduleCall('return fuzz.proveInputRecovery(window.PGSIMCITY)') as InputFinding[]
+          const recovery = await moduleCall('return fuzz.proveInputRecovery(window.SSDSIMCITY)') as InputFinding[]
           if (recovery.length > 0) {
             findings.push({
               seed: seedLabel(seed),

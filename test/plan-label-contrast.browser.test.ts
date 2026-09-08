@@ -49,15 +49,15 @@ describe('storage plan-label contrast', () => {
       path: '/',
       readySelector: '#canvas-root canvas',
       prepare: `(async () => {
-        for (let attempt = 0; attempt < 240 && !window.PGSIMCITY; attempt += 1) {
+        for (let attempt = 0; attempt < 240 && !window.SSDSIMCITY; attempt += 1) {
           await new Promise((resolve) => setTimeout(resolve, 250))
         }
-        if (!window.PGSIMCITY) throw new Error('PGSimCity did not expose its browser handle')
-        window.PGSIMCITY.sim.setKnob('paused', true)
+        if (!window.SSDSIMCITY) throw new Error('PGSimCity did not expose its browser handle')
+        window.SSDSIMCITY.sim.setKnob('paused', true)
       })()`,
     }], async ({ evaluate }) => evaluate(`(async () => {
       const audit = await import('/test/plan-label-contrast-browser.ts')
-      return audit.measurePlanLabelContrast(window.PGSIMCITY)
+      return audit.measurePlanLabelContrast(window.SSDSIMCITY)
     })()`)) as Report[]
 
     if (process.env.PLAN_CONTRAST_REPORT === '1') console.info(JSON.stringify(report, null, 2))

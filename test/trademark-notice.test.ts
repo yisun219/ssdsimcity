@@ -9,7 +9,7 @@ import type { UiContext } from '../src/ui/uikit'
 import { installTestDom } from './dom'
 
 const TRADEMARK_NOTICE =
-  'PGSimCity is an independent, non-commercial educational visualization of PostgreSQL internals. ' +
+  'SSDSimCity is an independent, non-commercial educational visualization of SSD internals. ' +
   'It is not affiliated with, sponsored, endorsed, or approved by Electronic Arts Inc. ' +
   'SimCity is a trademark of Electronic Arts Inc.'
 

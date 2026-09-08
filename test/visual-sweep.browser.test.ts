@@ -32,19 +32,19 @@ describe('live rendered city visual sweep', () => {
       path: '/',
       readySelector: '#canvas-root canvas',
       prepare: `(async () => {
-        for (let attempt = 0; attempt < 240 && !window.PGSIMCITY; attempt += 1) {
+        for (let attempt = 0; attempt < 240 && !window.SSDSIMCITY; attempt += 1) {
           await new Promise((resolve) => setTimeout(resolve, 250))
         }
-        if (!window.PGSIMCITY) throw new Error('PGSimCity did not expose its browser handle')
-        window.PGSIMCITY.sim.setKnob('paused', true)
-        window.PGSIMCITY.setThemeMode('day', { persist: false })
-        window.PGSIMCITY.bus.emit('quality', { level: 'medium' })
+        if (!window.SSDSIMCITY) throw new Error('PGSimCity did not expose its browser handle')
+        window.SSDSIMCITY.sim.setKnob('paused', true)
+        window.SSDSIMCITY.setThemeMode('day', { persist: false })
+        window.SSDSIMCITY.bus.emit('quality', { level: 'medium' })
       })()`,
     }], async ({ evaluate }) => evaluate(`(async () => {
       const sweep = await import('/test/visual-sweep-browser.ts')
-      const report = await sweep.runVisualSweep(window.PGSIMCITY)
-      const mirrorProof = await sweep.proveMirroredTextDetection(window.PGSIMCITY)
-      const nearPlaneProof = await sweep.proveNearPlaneZFightDetection(window.PGSIMCITY)
+      const report = await sweep.runVisualSweep(window.SSDSIMCITY)
+      const mirrorProof = await sweep.proveMirroredTextDetection(window.SSDSIMCITY)
+      const nearPlaneProof = await sweep.proveNearPlaneZFightDetection(window.SSDSIMCITY)
       return { report, mirrorProof, nearPlaneProof }
     })()`)) as [{ report: SweepReport; mirrorProof: SweepFinding[]; nearPlaneProof: SweepFinding[] }]
 

@@ -11,7 +11,7 @@ export const CORRECTION_LINK_TEXT = 'Report a problem with this claim on GitHub'
 export const CORRECTION_LINK_ACCESSIBLE_NAME =
   `${CORRECTION_LINK_TEXT} (opens in a new tab; submit the issue there to file the report)`
 
-const ISSUE_URL = 'https://github.com/NikolayS/SSDSimCity/issues/new'
+const ISSUE_URL = 'https://github.com/yisun219/ssdsimcity/issues/new'
 const NO_STATE =
   'No model state included: this displayed claim does not depend on live controls.'
 const protectedCorrectionLinks = new WeakSet<HTMLAnchorElement>()

@@ -492,7 +492,7 @@ describe('theme toggle entry point', () => {
       ),
     ).toEqual(names)
     expect(document.querySelector('.help-districts')?.textContent).toContain(names.join(' · '))
-    expect(document.querySelector('.help-build')?.textContent).toBe(`PGSimCity ${BUILD_LABEL}`)
+    expect(document.querySelector('.help-build')?.textContent).toBe(`SSDSimCity ${BUILD_LABEL}`)
 
     for (const destination of DESTINATIONS) {
       ctx.bus.emit('select', { id: destination.id })
@@ -563,8 +563,8 @@ describe('city-first panel state', () => {
 
     ;(document.querySelector('.pgc-tab--left') as HTMLButtonElement).click()
     ;(document.querySelector('.pgc-tab--right') as HTMLButtonElement).click()
-    expect(window.localStorage.getItem('pgsimcity.console.open')).toBe('1')
-    expect(window.localStorage.getItem('pgsimcity.inspector.open')).toBe('1')
+    expect(window.localStorage.getItem('ssdsimcity.console.open')).toBe('1')
+    expect(window.localStorage.getItem('ssdsimcity.inspector.open')).toBe('1')
 
     controls.dispose()
     inspector.dispose()
@@ -575,8 +575,8 @@ describe('city-first panel state', () => {
 
     ;(document.querySelector('.pgc-rail__collapse') as HTMLButtonElement).click()
     ;(document.querySelector('.pgc-insp__close') as HTMLButtonElement).click()
-    expect(window.localStorage.getItem('pgsimcity.console.open')).toBe('0')
-    expect(window.localStorage.getItem('pgsimcity.inspector.open')).toBe('0')
+    expect(window.localStorage.getItem('ssdsimcity.console.open')).toBe('0')
+    expect(window.localStorage.getItem('ssdsimcity.inspector.open')).toBe('0')
 
     controls.dispose()
     inspector.dispose()
@@ -681,7 +681,7 @@ describe('first-visit tour entry point', () => {
 
     expect(invitation.classList.contains('is-live')).toBe(true)
     expect(start.textContent).toContain('Start the tour')
-    expect(window.localStorage.getItem('pgsimcity.seen')).toBe('1')
+    expect(window.localStorage.getItem('ssdsimcity.seen')).toBe('1')
 
     tour.dispose()
     tour = createTour(ctx)

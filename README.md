@@ -1,10 +1,12 @@
-# PGSimCity
+# SSDSimCity
 
-**Walk through PostgreSQL. Break things. Understand why.**
+**Walk through a modern SSD. Break things. Understand why.**
 
-An explorable 3D city where buildings represent PostgreSQL internals and motion
-shows their interaction. Follow a query, investigate a growing table, or see
-what changes when memory, checkpoints and replication become bottlenecks.
+An explorable 3D city where buildings represent multi-queue SSD internals and
+motion shows their interaction. Follow one I/O request from a host submission
+queue through the FTL into NAND, investigate why writes suddenly stall when
+garbage collection starts, and see what changes when the write cache, mapping
+table, and flash channels become bottlenecks. Modeled on MQSim (FAST 2018).
 
 **[Explore the city](https://nikolays.github.io/PGSimCity/)** ·
 [Start an investigation](#start-here-investigate-a-vacuum-blockade)
@@ -41,19 +43,24 @@ Evidence and notes belong to the current attempt; they do not survive a reload.
 
 ## How much to trust this
 
-**The city is a model, not a running PostgreSQL server.** Its numbers and timing
-are scaled to make internals observable. The separate Machine and opt-in Query
-flow can execute real PostgreSQL through PGlite; they do not turn the city into
-a production monitor.
+**The city is a model, not a real SSD.** Its numbers and timing are scaled to
+make internals observable. It follows the device model of MQSim — Tavakkol et
+al., "MQSim: A Framework for Enabling Realistic Studies of Modern Multi-Queue
+SSD Devices", FAST 2018 — at teaching scale; it is not a cycle-accurate
+simulator and does not benchmark hardware.
 
-The project is an evolving 0.x prototype, with known simplifications and tests
-against PostgreSQL behavior. See [model accuracy and limitations](docs/MODEL-ACCURACY.md)
-for the reviewed reference version, formulas and review history.
-[Report a PostgreSQL mismatch](https://github.com/NikolayS/PGSimCity/issues/new?template=postgresql-mismatch.md).
+> The host issues large sequential sweeps; the city models PostgreSQL 18's bulk-read strategy with a fixed 32-frame ring so one big scan cannot evict the whole buffer pool. The device below serves whatever the host sends it.
 
-Lessons include keyboard and text-first routes; the 3D scene and first-person
-walk do not have a nonvisual equivalent. Touch verification has used browser
-emulation, not physical devices. [Accessibility and alternatives](ACCESSIBILITY.md).
+The project is an evolving 0.x prototype, with known simplifications. See
+[model accuracy and limitations](docs/MODEL-ACCURACY.md) for formulas and
+disclosures. [Report an SSD mismatch](https://github.com/yisun219/ssdsimcity/issues/new).
+
+Four review rounds shaped the current text. The device model follows
+MQSim's published configuration (REL_18_STABLE is the PostgreSQL source branch
+the host-side claims were checked against). Lessons include keyboard and
+text-first routes; the 3D scene and first-person walk do not have a nonvisual
+equivalent. Touch verification has used browser emulation, not physical
+devices. [Accessibility and alternatives](ACCESSIBILITY.md).
 
 ---
 

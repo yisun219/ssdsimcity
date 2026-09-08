@@ -223,7 +223,7 @@ describe('keyboard and screen-reader lesson routes', () => {
       readySelector: '#hud-top',
       reducedMotion: true,
       prepare: `(async () => {
-        for (let attempt = 0; attempt < 120 && !window.PGSIMCITY; attempt += 1) {
+        for (let attempt = 0; attempt < 120 && !window.SSDSIMCITY; attempt += 1) {
           await new Promise((resolve) => setTimeout(resolve, 100))
         }
       })()`,
@@ -239,7 +239,7 @@ describe('keyboard and screen-reader lesson routes', () => {
       reducedMotion: true,
     }], async ({ accessibilityTree, evaluate, page }) => {
       if (page.name === 'City') {
-        return { name: page.name, paused: await evaluate(`window.PGSIMCITY.sim.state.knobs.paused`) }
+        return { name: page.name, paused: await evaluate(`window.SSDSIMCITY.sim.state.knobs.paused`) }
       }
       if (page.name === 'Diagnose') {
         return {

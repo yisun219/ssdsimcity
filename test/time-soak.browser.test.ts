@@ -33,7 +33,7 @@ interface BrowserSoakReport {
 }
 
 const SNAPSHOT = `(() => {
-  const pg = window.PGSIMCITY
+  const pg = window.SSDSIMCITY
   let sceneObjects = 0
   pg.gfx.scene.traverse(() => sceneObjects++)
   return {
@@ -60,7 +60,7 @@ function metric(metrics: { metrics: { name: string; value: number }[] }, name: s
 
 // Keep this deliberately long browser run opt-in so it does not consume one of
 // the two shared browser slots for the duration of the default test suite.
-describe.skipIf(process.env.PGSIMCITY_BROWSER_SOAK !== '1')('long browser-path soak', () => {
+describe.skipIf(process.env.SSDSIMCITY_BROWSER_SOAK !== '1')('long browser-path soak', () => {
   it('keeps renderer-owned pools and heap bounded while model time advances', async () => {
     const [report] = await inspectRenderedPages([{
       name: 'City time soak',
@@ -78,11 +78,11 @@ describe.skipIf(process.env.PGSIMCITY_BROWSER_SOAK !== '1')('long browser-path s
         }
       })()`,
       prepare: `(async () => {
-        for (let attempt = 0; attempt < 240 && !window.PGSIMCITY; attempt++) {
+        for (let attempt = 0; attempt < 240 && !window.SSDSIMCITY; attempt++) {
           await new Promise((resolve) => setTimeout(resolve, 250))
         }
-        if (!window.PGSIMCITY) throw new Error('PGSimCity did not expose its browser handle')
-        const pg = window.PGSIMCITY
+        if (!window.SSDSIMCITY) throw new Error('PGSimCity did not expose its browser handle')
+        const pg = window.SSDSIMCITY
         pg.bus.emit('quality', { level: 'low' })
         pg.sim.setKnob('timeScale', 20)
         pg.sim.setKnob('tps', 80)
@@ -105,7 +105,7 @@ describe.skipIf(process.env.PGSIMCITY_BROWSER_SOAK !== '1')('long browser-path s
       }
 
       await evaluate(`(async () => {
-        const pg = window.PGSIMCITY
+        const pg = window.SSDSIMCITY
         pg.sim.setKnob('poolMode', 'transaction')
         pg.sim.setKnob('defaultPoolSize', 4)
         pg.bus.emit('quality', { level: 'medium' })
@@ -116,9 +116,9 @@ describe.skipIf(process.env.PGSIMCITY_BROWSER_SOAK !== '1')('long browser-path s
       await send('HeapProfiler.collectGarbage')
       const finalHeap = metric(await send('Performance.getMetrics'), 'JSHeapUsedSize')
       const interaction = await evaluate(`({
-        mode: window.PGSIMCITY.sim.state.pooler.mode,
-        serverLimit: window.PGSIMCITY.sim.state.pooler.serverLimit,
-        quality: window.PGSIMCITY.gfx.quality.level,
+        mode: window.SSDSIMCITY.sim.state.pooler.mode,
+        serverLimit: window.SSDSIMCITY.sim.state.pooler.serverLimit,
+        quality: window.SSDSIMCITY.gfx.quality.level,
       })`)
 
       return {

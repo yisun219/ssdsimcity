@@ -5,17 +5,17 @@ describe('paused workload stepping', () => {
   it('supports keyboard stepping and a visible phone control without changing speed or pause', async () => {
     const reports = await inspectRenderedPages([{ name: 'City', path: '/', readySelector: '.hud-play', reducedMotion: true }], async ({ evaluate, send }) => {
       await evaluate(`(async () => {
-        while (!window.PGSIMCITY) await new Promise(r => setTimeout(r, 50))
+        while (!window.SSDSIMCITY) await new Promise(r => setTimeout(r, 50))
       })()`)
       const initial = await evaluate(`(() => {
         const b = document.querySelector('.hud-step')
         if (!b) throw Error('Missing model-step control')
         b.focus()
-        return { active: document.activeElement.className, hidden: b.hidden, paused: window.PGSIMCITY.sim.state.knobs.paused, t: window.PGSIMCITY.sim.state.t, speed: window.PGSIMCITY.sim.state.knobs.timeScale }
+        return { active: document.activeElement.className, hidden: b.hidden, paused: window.SSDSIMCITY.sim.state.knobs.paused, t: window.SSDSIMCITY.sim.state.t, speed: window.SSDSIMCITY.sim.state.knobs.timeScale }
       })()`)
       await send('Input.dispatchKeyEvent', { type: 'keyDown', text: '\r', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
       await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
-      const after = await evaluate(`({ t: window.PGSIMCITY.sim.state.t, paused: window.PGSIMCITY.sim.state.knobs.paused, speed: window.PGSIMCITY.sim.state.knobs.timeScale })`)
+      const after = await evaluate(`({ t: window.SSDSIMCITY.sim.state.t, paused: window.SSDSIMCITY.sim.state.knobs.paused, speed: window.SSDSIMCITY.sim.state.knobs.timeScale })`)
       await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
       const phone = await evaluate(`new Promise(resolve => requestAnimationFrame(() => {
         const b = document.querySelector('.hud-step'); const r = b.getBoundingClientRect()
@@ -23,7 +23,7 @@ describe('paused workload stepping', () => {
       }))`)
       await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: phone.x, y: phone.y }] })
       await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
-      const touch = await evaluate(`({ t: window.PGSIMCITY.sim.state.t, paused: window.PGSIMCITY.sim.state.knobs.paused })`)
+      const touch = await evaluate(`({ t: window.SSDSIMCITY.sim.state.t, paused: window.SSDSIMCITY.sim.state.knobs.paused })`)
       const lessonClear = await evaluate(`new Promise(resolve => {
         document.querySelector('.hud-investigate').click()
         document.querySelector('.vacuum-lesson__notes').open = true

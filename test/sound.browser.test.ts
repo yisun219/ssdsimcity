@@ -107,7 +107,7 @@ describe('movement sound in a rendered city', () => {
       })()`)
 
       await keyPress('M', { code: 'KeyM' })
-      await waitFor(`window.PGSIMCITY.audio.enabled`)
+      await waitFor(`window.SSDSIMCITY.audio.enabled`)
       const orbitToast = await evaluate(`document.querySelector('.hud-toast__txt')?.textContent ?? ''`)
       await waitFor(`document.querySelector('.hud-audio').getAttribute('aria-pressed') === 'true'`)
       const orbitCopy = { ...await copy(), toast: orbitToast }
@@ -121,23 +121,23 @@ describe('movement sound in a rendered city', () => {
       }
 
       await keyPress('M', { code: 'KeyM' })
-      await waitFor(`!window.PGSIMCITY.audio.enabled`)
+      await waitFor(`!window.SSDSIMCITY.audio.enabled`)
       await keyPress('G', { code: 'KeyG' })
-      await waitFor(`window.PGSIMCITY.rig.mode === 'walk' && window.PGSIMCITY.walk.enabled`)
+      await waitFor(`window.SSDSIMCITY.rig.mode === 'walk' && window.SSDSIMCITY.walk.enabled`)
       await evaluate(`(() => {
-        window.PGSIMCITY.walk.setPose({ x: 0, y: 3.75, z: 48, yaw: 0, pitch: 0 })
+        window.SSDSIMCITY.walk.setPose({ x: 0, y: 3.75, z: 48, yaw: 0, pitch: 0 })
       })()`)
-      await waitFor(`window.PGSIMCITY.walk.grounded`)
+      await waitFor(`window.SSDSIMCITY.walk.grounded`)
       await keyPress('M', { code: 'KeyM' })
-      await waitFor(`window.PGSIMCITY.audio.enabled`)
+      await waitFor(`window.SSDSIMCITY.audio.enabled`)
       const walkToast = await evaluate(`document.querySelector('.hud-toast__txt')?.textContent ?? ''`)
       await waitFor(`document.querySelector('.hud-audio').getAttribute('aria-pressed') === 'true'`)
       const beforeWalk = await evaluate(`window.__pgAudioProbe.report()`)
       const beforeMovement = await evaluate(`({
-        distance: window.PGSIMCITY.walk.distance,
-        speed: window.PGSIMCITY.walk.speed,
-        grounded: window.PGSIMCITY.walk.grounded,
-        position: window.PGSIMCITY.walk.position.toArray(),
+        distance: window.SSDSIMCITY.walk.distance,
+        speed: window.SSDSIMCITY.walk.speed,
+        grounded: window.SSDSIMCITY.walk.grounded,
+        position: window.SSDSIMCITY.walk.position.toArray(),
       })`)
       const walkCopy = { ...await copy(), toast: walkToast }
       /* A running context can still have a frozen output clock after idle.
@@ -146,17 +146,17 @@ describe('movement sound in a rendered city', () => {
       console.info('walking audio clock readiness', JSON.stringify(readiness))
       const walkSignal = await evaluate(`(async () => {
         const measurement = window.__pgAudioProbe.measure(800)
-        window.PGSIMCITY.walk.setTouchMove(1, 0)
-        for (let frame = 0; frame < 30; frame += 1) window.PGSIMCITY.walk.update(0.05)
-        window.PGSIMCITY.walk.setTouchMove(0, 0)
+        window.SSDSIMCITY.walk.setTouchMove(1, 0)
+        for (let frame = 0; frame < 30; frame += 1) window.SSDSIMCITY.walk.update(0.05)
+        window.SSDSIMCITY.walk.setTouchMove(0, 0)
         return measurement
       })()`)
       const afterWalk = await evaluate(`window.__pgAudioProbe.report()`)
       const afterMovement = await evaluate(`({
-        distance: window.PGSIMCITY.walk.distance,
-        speed: window.PGSIMCITY.walk.speed,
-        grounded: window.PGSIMCITY.walk.grounded,
-        position: window.PGSIMCITY.walk.position.toArray(),
+        distance: window.SSDSIMCITY.walk.distance,
+        speed: window.SSDSIMCITY.walk.speed,
+        grounded: window.SSDSIMCITY.walk.grounded,
+        position: window.SSDSIMCITY.walk.position.toArray(),
       })`)
 
       return {

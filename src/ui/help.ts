@@ -311,9 +311,9 @@ export function createHelp(ctx: UiContext): UiModule {
         'with independent attempts to refute each finding, a separate geometry audit, and the deterministic test suite provide evidence, not a guarantee. ' +
         'Mistakes have been found and fixed throughout. ' +
         "Touch controls have been verified only in Chrome's mobile emulation. " +
-        '<a href="https://github.com/NikolayS/SSDSimCity#how-much-to-trust-this" target="_blank" rel="noopener">See exactly what was checked.</a>' +
+        '<a href="https://github.com/yisun219/ssdsimcity#how-much-to-trust-this" target="_blank" rel="noopener">See exactly what was checked.</a>' +
         '<br><br>Found one? Use “Report a problem with this claim on GitHub ↗” at the foot of the panel so its exact claim and source arrive with the report, or send a ' +
-        '<a href="https://github.com/NikolayS/SSDSimCity/pulls" target="_blank" rel="noopener">pull request</a>.',
+        '<a href="https://github.com/yisun219/ssdsimcity/pulls" target="_blank" rel="noopener">pull request</a>.',
     }),
     el('p', {
       class: 'help-disclaimer',

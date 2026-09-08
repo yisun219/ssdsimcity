@@ -517,9 +517,9 @@ export async function measureTierDisclosurePage(evaluatePage, page, viewport, le
   for (const level of levels) {
     if (page.prepareDisclosures) await evaluatePage(page.prepareDisclosures)
     const quality = await evaluatePage(`new Promise((resolve) => {
-      window.PGSIMCITY.bus.emit('quality', { level: ${JSON.stringify(level)} })
+      window.SSDSIMCITY.bus.emit('quality', { level: ${JSON.stringify(level)} })
       requestAnimationFrame(() => requestAnimationFrame(() => {
-        resolve({ ...window.PGSIMCITY.gfx.quality })
+        resolve({ ...window.SSDSIMCITY.gfx.quality })
       }))
     })`)
     const tierPage = { ...page, name: `${page.name} · ${level}` }
@@ -535,9 +535,9 @@ export async function measureTierTouchTargetPages(pages, levels) {
     const reports = []
     for (const level of levels) {
       const quality = await evaluate(`new Promise((resolve) => {
-        window.PGSIMCITY.bus.emit('quality', { level: ${JSON.stringify(level)} })
+        window.SSDSIMCITY.bus.emit('quality', { level: ${JSON.stringify(level)} })
         requestAnimationFrame(() => requestAnimationFrame(() => {
-          resolve({ ...window.PGSIMCITY.gfx.quality })
+          resolve({ ...window.SSDSIMCITY.gfx.quality })
         }))
       })`)
       const tierPage = { ...page, name: `${page.name} · ${level}` }

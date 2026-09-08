@@ -5,8 +5,8 @@ describe('phone heap anatomy', () => {
   it('keeps writer text and every version card within their layout cells', async () => {
     const reports = await inspectRenderedPages([{ name: 'anatomy', path: '/', readySelector: '.hud-theme', reducedMotion: true }], async ({ evaluate, send }) => {
       await evaluate(`(async () => {
-        while (!window.PGSIMCITY || !document.querySelector('.an-overlay')) await new Promise(r => setTimeout(r, 50))
-        const app = window.PGSIMCITY
+        while (!window.SSDSIMCITY || !document.querySelector('.an-overlay')) await new Promise(r => setTimeout(r, 50))
+        const app = window.SSDSIMCITY
         app.sim.runScenario('vacuum-blockade')
         for (let i = 0; i < 2400; i++) app.sim.update(1/30)
         app.sim.setKnob('paused', true)

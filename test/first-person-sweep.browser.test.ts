@@ -62,17 +62,17 @@ describe('live rendered city first-person sweep', () => {
       path: '/',
       readySelector: '#canvas-root canvas',
       prepare: `(async () => {
-        for (let attempt = 0; attempt < 240 && !window.PGSIMCITY; attempt += 1) {
+        for (let attempt = 0; attempt < 240 && !window.SSDSIMCITY; attempt += 1) {
           await new Promise((resolve) => setTimeout(resolve, 250))
         }
-        if (!window.PGSIMCITY) throw new Error('PGSimCity did not expose its browser handle')
-        window.PGSIMCITY.sim.setKnob('paused', true)
-        window.PGSIMCITY.bus.emit('quality', { level: 'high' })
+        if (!window.SSDSIMCITY) throw new Error('PGSimCity did not expose its browser handle')
+        window.SSDSIMCITY.sim.setKnob('paused', true)
+        window.SSDSIMCITY.bus.emit('quality', { level: 'high' })
       })()`,
     }], async ({ evaluate, send }) => {
       const report = await evaluate(`(async () => {
         const sweep = await import('/test/first-person-sweep-browser.ts')
-        return sweep.runFirstPersonSweep(window.PGSIMCITY)
+        return sweep.runFirstPersonSweep(window.SSDSIMCITY)
       })()`) as Report
 
       if (artifactDir) {
@@ -84,13 +84,13 @@ describe('live rendered city first-person sweep', () => {
           if (worst) {
             await evaluate(`(async () => {
               const sweep = await import('/test/first-person-sweep-browser.ts')
-              await sweep.stageFirstPersonFinding(window.PGSIMCITY, ${JSON.stringify(worst)})
+              await sweep.stageFirstPersonFinding(window.SSDSIMCITY, ${JSON.stringify(worst)})
             })()`)
             await saveScreenshot(send, join(artifactDir, 'first-person-worst.png'))
           }
           await evaluate(`(async () => {
             const sweep = await import('/test/first-person-sweep-browser.ts')
-            await sweep.stageHandsScreenshot(window.PGSIMCITY, ${JSON.stringify(report.hands.station)})
+            await sweep.stageHandsScreenshot(window.SSDSIMCITY, ${JSON.stringify(report.hands.station)})
           })()`)
           await saveScreenshot(send, join(artifactDir, 'first-person-hands.png'))
         }
@@ -98,7 +98,7 @@ describe('live rendered city first-person sweep', () => {
 
       const nearPlaneProof = await evaluate(`(async () => {
         const sweep = await import('/test/first-person-sweep-browser.ts')
-        return sweep.proveNearPlaneDetection(window.PGSIMCITY)
+        return sweep.proveNearPlaneDetection(window.SSDSIMCITY)
       })()`) as Finding[]
       return { report, nearPlaneProof }
     }) as [{ report: Report; nearPlaneProof: Finding[] }]

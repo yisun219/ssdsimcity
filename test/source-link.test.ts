@@ -6,7 +6,7 @@ import { createHud } from '../src/ui/hud'
 import type { UiContext } from '../src/ui/uikit'
 import { installTestDom } from './dom'
 
-const REPOSITORY_URL = 'https://github.com/NikolayS/PGSimCity'
+const REPOSITORY_URL = 'https://github.com/yisun219/ssdsimcity'
 
 function context(): UiContext {
   const bus = createBus()

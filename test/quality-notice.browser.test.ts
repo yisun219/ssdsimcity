@@ -5,8 +5,8 @@ describe('quality notice placement', () => {
   it('keeps the model qualification and transport reachable while a warning is present', async () => {
     const reports = await inspectRenderedPages([{ name: 'City', path: '/', readySelector: '.hud-theme', reducedMotion: true }], async ({ evaluate }) => {
       return evaluate(`(async () => {
-        while (!window.PGSIMCITY) await new Promise(r => setTimeout(r, 50))
-        window.PGSIMCITY.bus.emit('toast', {text:'Frame rate stayed low — bloom lighting disabled. Bright-colour fallback is active.',kind:'warn',ms:60000,action:{label:'Restore high',quality:'high'}})
+        while (!window.SSDSIMCITY) await new Promise(r => setTimeout(r, 50))
+        window.SSDSIMCITY.bus.emit('toast', {text:'Frame rate stayed low — bloom lighting disabled. Bright-colour fallback is active.',kind:'warn',ms:60000,action:{label:'Restore high',quality:'high'}})
         await new Promise(r=>setTimeout(r,400))
         const summary=document.querySelector('#city-version-provenance summary')
         const warning=[...document.querySelectorAll('.hud-toast')].find(e=>e.textContent.includes('bloom lighting disabled'))

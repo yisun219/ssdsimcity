@@ -11,9 +11,9 @@ it('keeps medium night HDR pixels finite after daylight', async () => {
     })
     await evaluate(`(async () => {
       // The HUD can mount before the city debugging surface is published.
-      for (let i = 0; i < 200 && !window.PGSIMCITY; i++) await new Promise(resolve => setTimeout(resolve, 50))
-      if (!window.PGSIMCITY) throw new Error('City debugging surface not ready')
-      const p = window.PGSIMCITY
+      for (let i = 0; i < 200 && !window.SSDSIMCITY; i++) await new Promise(resolve => setTimeout(resolve, 50))
+      if (!window.SSDSIMCITY) throw new Error('City debugging surface not ready')
+      const p = window.SSDSIMCITY
       const render = p.gfx.render.bind(p.gfx)
       // Pin the requested tier for this correctness check, not a performance test.
       p.gfx.render = dt => render(dt, 1 / 60)
@@ -24,7 +24,7 @@ it('keeps medium night HDR pixels finite after daylight', async () => {
     })()`)
     await evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
     return evaluate(`new Promise(resolve => {
-      const p = window.PGSIMCITY, r = p.gfx.renderer
+      const p = window.SSDSIMCITY, r = p.gfx.renderer
       for (let i = 0; i < 3 && p.themeMode() !== 'night'; i++) document.querySelector('.hud-theme').click()
       p.bus.emit('focus', { id: 'backend.row', instant: true })
       const original = r.render.bind(r)

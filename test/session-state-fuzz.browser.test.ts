@@ -61,10 +61,10 @@ function storedPage(
       }
     })()`,
     prepare: `(async () => {
-      for (let attempt = 0; attempt < 120 && !window.PGSIMCITY; attempt += 1) {
+      for (let attempt = 0; attempt < 120 && !window.SSDSIMCITY; attempt += 1) {
         await new Promise((resolve) => setTimeout(resolve, 100))
       }
-      if (!window.PGSIMCITY) throw new Error('PGSimCity did not initialise')
+      if (!window.SSDSIMCITY) throw new Error('PGSimCity did not initialise')
     })()`,
   }
 }
@@ -103,7 +103,7 @@ describe('persisted state in a production phone bootstrap', () => {
 
     const reports = await inspectRenderedPages(pages, async ({ evaluate, page }): Promise<BrowserProbe> => {
       return evaluate(`(() => {
-        const { bus, sim } = window.PGSIMCITY
+        const { bus, sim } = window.SSDSIMCITY
         const toasts = []
         const dispose = bus.on('toast', ({ text }) => toasts.push(text))
         const step = 1 / 15

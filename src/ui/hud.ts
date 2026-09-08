@@ -551,7 +551,7 @@ export function createHud(ctx: UiContext, options: { onInvestigate?: () => void 
     'a',
     {
       class: 'pg-btn hud-tool hud-source',
-      href: 'https://github.com/NikolayS/SSDSimCity',
+      href: 'https://github.com/yisun219/ssdsimcity',
       target: '_blank',
       rel: 'noopener',
       title: 'SSDSimCity source code on GitHub',

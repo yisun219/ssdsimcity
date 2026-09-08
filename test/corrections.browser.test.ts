@@ -76,7 +76,7 @@ describe('PostgreSQL correction reports', () => {
     const url = new URL(href)
 
     expect(url.origin).toBe('https://github.com')
-    expect(url.pathname).toBe('/NikolayS/PGSimCity/issues/new')
+    expect(url.pathname).toBe('/yisun219/ssdsimcity/issues/new')
     expect(url.searchParams.get('template')).toBe(CORRECTION_ISSUE_TEMPLATE)
     expect(url.searchParams.get('title')).toBe(
       '[PostgreSQL mismatch] Diagnose — v.backend_writes — Backends are doing the writes',
@@ -213,7 +213,7 @@ describe('PostgreSQL correction reports', () => {
       // The overlay can exist before the debugging API is published during boot.
       beforeLoad: `(() => {
         let ready
-        Object.defineProperty(window, 'PGSIMCITY', {
+        Object.defineProperty(window, 'SSDSIMCITY', {
           configurable: true,
           get: () => ready,
           set: value => { setTimeout(() => { ready = value }, 1000) },
@@ -233,11 +233,11 @@ describe('PostgreSQL correction reports', () => {
         document.querySelector('#hud-latency-panel').hidden = false
       })()`,
       prepare: `(async () => {
-        for (let attempt = 0; attempt < 200 && !window.PGSIMCITY; attempt++) {
+        for (let attempt = 0; attempt < 200 && !window.SSDSIMCITY; attempt++) {
           await new Promise(resolve => setTimeout(resolve, 100))
         }
-        if (!window.PGSIMCITY) throw Error('City API did not become ready')
-        const { sim, bus } = window.PGSIMCITY
+        if (!window.SSDSIMCITY) throw Error('City API did not become ready')
+        const { sim, bus } = window.SSDSIMCITY
         document.querySelector('.control-center').hidden = false
         document.querySelector('#hud-latency-panel').hidden = false
         sim.setKnob('recoveryTargetAge', 40)

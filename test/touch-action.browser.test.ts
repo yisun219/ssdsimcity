@@ -160,10 +160,10 @@ describe('native multi-touch gestures', () => {
         window.requestAnimationFrame = (callback) => callback.name === 'frame' ? 0 : schedule(callback)
       })()`,
       prepare: `(async () => {
-        for (let attempt = 0; attempt < 120 && !window.PGSIMCITY; attempt += 1) {
+        for (let attempt = 0; attempt < 120 && !window.SSDSIMCITY; attempt += 1) {
           await new Promise((resolve) => setTimeout(resolve, 100))
         }
-        if (!window.PGSIMCITY) throw new Error('PGSimCity did not initialise')
+        if (!window.SSDSIMCITY) throw new Error('PGSimCity did not initialise')
       })()`,
     }], async ({ evaluate, send }): Promise<TouchActionReport> => {
       const targets = await evaluate(ENUMERATE_GESTURE_TARGETS, {
@@ -198,8 +198,8 @@ describe('native multi-touch gestures', () => {
         mobile: true,
       })
       await evaluate(`(() => {
-        window.PGSIMCITY.rig.resize(800, 600)
-        window.PGSIMCITY.rig.focusOn(
+        window.SSDSIMCITY.rig.resize(800, 600)
+        window.SSDSIMCITY.rig.focusOn(
           { target: [0, 0, 0], distance: 48, dir: [-0.6, 0.5, 0.8] },
           { instant: true },
         )
@@ -229,8 +229,8 @@ describe('native multi-touch gestures', () => {
               return
             }
             setTimeout(() => {
-              window.PGSIMCITY.rig.update(1 / 60)
-              resolve(window.PGSIMCITY.gfx.camera.position.distanceTo(window.PGSIMCITY.rig.pivot))
+              window.SSDSIMCITY.rig.update(1 / 60)
+              resolve(window.SSDSIMCITY.gfx.camera.position.distanceTo(window.SSDSIMCITY.rig.pivot))
             }, 0)
           }
           afterDelivery()

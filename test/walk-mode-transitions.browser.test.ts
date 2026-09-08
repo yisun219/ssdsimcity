@@ -9,11 +9,11 @@ describe('rendered walk camera transitions', () => {
       path: '/',
       readySelector: '#canvas-root canvas',
       prepare: `(async () => {
-        for (let attempt = 0; attempt < 240 && !window.PGSIMCITY; attempt += 1) {
+        for (let attempt = 0; attempt < 240 && !window.SSDSIMCITY; attempt += 1) {
           await new Promise((resolve) => setTimeout(resolve, 250))
         }
-        if (!window.PGSIMCITY) throw new Error('PGSimCity did not expose its browser handle')
-        window.PGSIMCITY.sim.setKnob('paused', true)
+        if (!window.SSDSIMCITY) throw new Error('PGSimCity did not expose its browser handle')
+        window.SSDSIMCITY.sim.setKnob('paused', true)
       })()`,
     }], async ({ evaluate, keyPress }) => {
       const waitFor = (condition: string) => evaluate(`new Promise((resolve, reject) => {
@@ -30,12 +30,12 @@ describe('rendered walk camera transitions', () => {
       })`)
 
       await keyPress('G', { code: 'KeyG' })
-      await waitFor(`window.PGSIMCITY.rig.mode === 'walk' && window.PGSIMCITY.walk.enabled`)
-      await evaluate(`window.PGSIMCITY.walk.setPose({ x: 0, y: 3.75, z: 48, yaw: 0, pitch: 0 })`)
+      await waitFor(`window.SSDSIMCITY.rig.mode === 'walk' && window.SSDSIMCITY.walk.enabled`)
+      await evaluate(`window.SSDSIMCITY.walk.setPose({ x: 0, y: 3.75, z: 48, yaw: 0, pitch: 0 })`)
       await keyPress('F', { code: 'KeyF' })
-      await waitFor(`!window.PGSIMCITY.walk.enabled`)
+      await waitFor(`!window.SSDSIMCITY.walk.enabled`)
 
-      return evaluate(`({ mode: window.PGSIMCITY.rig.mode })`)
+      return evaluate(`({ mode: window.SSDSIMCITY.rig.mode })`)
     })
 
     expect(result).toEqual({ mode: 'fly' })
