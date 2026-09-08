@@ -124,6 +124,7 @@ import {
   weightedPick,
 } from '../core/util'
 import { SCENARIOS, SCENARIO_NARRATION_SECONDS } from './scenarios'
+import { SsdDeviceEngine } from './ssd-device'
 import {
   collectRepresentativeVersions,
   createRepresentativeRow,
@@ -773,6 +774,8 @@ export function createSim(bus: Bus, options: Readonly<SimOptions> = {}): SimApi 
     retainedBytes: 0,
   }
 
+  const ssdEngine = new SsdDeviceEngine(DEFAULT_KNOBS, N_BACKEND_SLOTS)
+
   const state: SimState = {
     t: 0,
     realT: 0,
@@ -1197,6 +1200,7 @@ export function createSim(bus: Bus, options: Readonly<SimOptions> = {}): SimApi 
       deadMade: 0,
       lastTripSec: 0,
     },
+    ssd: ssdEngine.state,
   }
 
   const K = state.knobs
@@ -8679,6 +8683,43 @@ export function createSim(bus: Bus, options: Readonly<SimOptions> = {}): SimApi 
         break
       case 'timeScale':
         K.timeScale = clamp(K.timeScale, 0.05, 20)
+        break
+      case 'queueFetchSize':
+        K.queueFetchSize = clamp(Math.round(K.queueFetchSize), 1, 1024)
+        state.ssd.hostInterface.queueFetchSize = K.queueFetchSize
+        break
+      case 'dataCacheMiB':
+        K.dataCacheMiB = clamp(Math.round(K.dataCacheMiB), 16, 4096)
+        state.ssd.writeCache.capacityBytes = K.dataCacheMiB * 1024 * 1024
+        break
+      case 'cmtCapacityMiB':
+        K.cmtCapacityMiB = clamp(Math.round(K.cmtCapacityMiB), 1, 64)
+        state.ssd.cmt.capacity = Math.floor((K.cmtCapacityMiB * 1024 * 1024) / 8)
+        break
+      case 'overprovisioning':
+        K.overprovisioning = clamp(K.overprovisioning, 0.04, 0.28)
+        state.ssd.overprovisioning = K.overprovisioning
+        break
+      case 'gcExecThreshold':
+        K.gcExecThreshold = clamp(K.gcExecThreshold, 0.02, 0.3)
+        break
+      case 'gcHardThreshold':
+        K.gcHardThreshold = clamp(K.gcHardThreshold, 0.005, 0.05)
+        break
+      case 'preemptibleGc':
+        state.ssd.gc.preemptible = K.preemptibleGc
+        break
+      case 'iops':
+        K.iops = Math.max(0, K.iops)
+        break
+      case 'requestSizeKiB':
+        K.requestSizeKiB = clamp(K.requestSizeKiB, 4, 128)
+        break
+      case 'randomShare':
+        K.randomShare = clamp01(K.randomShare)
+        break
+      case 'writeRatio':
+        K.writeRatio = clamp01(K.writeRatio)
         break
       default:
         break

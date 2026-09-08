@@ -9,6 +9,7 @@
 import type * as THREE from 'three'
 import { CLAIM_VALUES } from './claims'
 import type { RegisteredClaimValue } from './claims'
+import type { SsdDeviceState } from './ssd-types'
 
 /* ---------------------------------------------------------------------------
  * City constants — geometry and simulation must agree on these counts.
@@ -171,6 +172,32 @@ export interface Knobs {
   oldPrimaryDataIntact: boolean
   /** Whether WAL back to the divergence point has not been recycled. */
   rewindWalRetained: boolean
+  /** NVMe QueueFetchSize: max in-flight entries fetched per submission queue. */
+  queueFetchSize: number
+  /** Device DRAM data cache in MiB (MQSim Data_Cache_Capacity). */
+  dataCacheMiB: number
+  /** Cached mapping table in MiB (MQSim CMT_Capacity). */
+  cmtCapacityMiB: number
+  /** 0..1 — overprovisioning ratio reserved behind the logical space. */
+  overprovisioning: number
+  /** GC starts when the free-page pool falls below this share. */
+  gcExecThreshold: number
+  /** Preemptible GC stops while the free pool is above this share. */
+  gcHardThreshold: number
+  /** Preemptible GC suspends erases for user reads. */
+  preemptibleGc: boolean
+  /** 0..1 — share of accesses uniformly random (vs hot-set skewed). */
+  randomShare: number
+  /** Mean request size in KiB. */
+  requestSizeKiB: number
+  /** Offered aggregate IOPS across all host submission queues. */
+  iops: number
+  /** How the device DRAM cache is shared among concurrent flows. */
+  cacheSharing: 'SHARED' | 'EQUAL_PARTITIONING'
+  /** What the device cache caches (MQSim Device_Level_Data_Caching_Mode). */
+  readCacheMode: 'WRITE_CACHE' | 'READ_CACHE' | 'WRITE_READ_CACHE' | 'TURNED_OFF'
+  /** FTL transaction scheduling policy. */
+  schedulingPolicy: 'OUT_OF_ORDER' | 'PRIORITY_OUT_OF_ORDER'
   /** Simulation speed multiplier. */
   timeScale: number
   paused: boolean
@@ -206,7 +233,6 @@ export const DEFAULT_KNOBS: Knobs = {
   walLevel: 'replica',
   fullPageWrites: true,
   autovacuum: true,
-  // PostgreSQL's own default is 0.2. This city ships the per-table tuning its
   // own docs recommend for a busy relation, because at 0.2 the demo tables need
   // ~5,900 dead rows to cross the threshold — which at this transaction rate is
   // most of an hour, and the autovacuum yard, its three bays, its landfill and
@@ -232,6 +258,19 @@ export const DEFAULT_KNOBS: Knobs = {
   walLogHints: true,
   oldPrimaryDataIntact: true,
   rewindWalRetained: true,
+  queueFetchSize: 512,
+  dataCacheMiB: 256,
+  cmtCapacityMiB: 4,
+  overprovisioning: 0.12,
+  gcExecThreshold: 0.06,
+  gcHardThreshold: 0.03,
+  preemptibleGc: true,
+  randomShare: 0.5,
+  requestSizeKiB: 8,
+  iops: 1200,
+  cacheSharing: 'SHARED',
+  readCacheMode: 'WRITE_CACHE',
+  schedulingPolicy: 'PRIORITY_OUT_OF_ORDER',
   timeScale: 1,
   paused: false,
 }
@@ -1228,6 +1267,8 @@ export interface SimState {
   forkPulse: number
   /** model-owned record of the requested statement trip */
   trace: TraceRecord
+  /** The modelled NVMe device: host interface, FTL, NAND, GC. */
+  ssd: SsdDeviceState
 }
 
 function completeArchiveSegments(startLsn: number, archivedThroughLsn: number, segmentSize: number): number {

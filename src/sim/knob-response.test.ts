@@ -676,6 +676,111 @@ const RESPONSE_CONTRACTS = {
       return sim.state.t
     },
   },
+  queueFetchSize: {
+    target: 32,
+    measure(value: number) {
+      const sim = createSim(createBus())
+      sim.setKnob('queueFetchSize', value)
+      return sim.state.ssd.hostInterface.queueFetchSize
+    },
+  },
+  dataCacheMiB: {
+    target: 512,
+    measure(value: number) {
+      const sim = createSim(createBus())
+      sim.setKnob('dataCacheMiB', value)
+      return sim.state.ssd.writeCache.capacityBytes
+    },
+  },
+  cmtCapacityMiB: {
+    target: 8,
+    measure(value: number) {
+      const sim = createSim(createBus())
+      sim.setKnob('cmtCapacityMiB', value)
+      return sim.state.ssd.cmt.capacity
+    },
+  },
+  overprovisioning: {
+    target: 0.2,
+    measure(value: number) {
+      const sim = createSim(createBus())
+      sim.setKnob('overprovisioning', value)
+      return sim.state.ssd.overprovisioning
+    },
+  },
+  gcExecThreshold: {
+    target: 0.3,
+    measure(value: number) {
+      const sim = createSim(createBus())
+      sim.setKnob('gcExecThreshold', value)
+      return sim.state.knobs.gcExecThreshold
+    },
+  },
+  gcHardThreshold: {
+    target: 0.02,
+    measure(value: number) {
+      const sim = createSim(createBus())
+      sim.setKnob('gcHardThreshold', value)
+      return sim.state.knobs.gcHardThreshold
+    },
+  },
+  preemptibleGc: {
+    target: false,
+    measure(value: boolean) {
+      const sim = createSim(createBus())
+      sim.setKnob('preemptibleGc', value)
+      return sim.state.ssd.gc.preemptible
+    },
+  },
+  randomShare: {
+    target: 1,
+    measure(value: number) {
+      const sim = createSim(createBus())
+      sim.setKnob('randomShare', value)
+      return sim.state.knobs.randomShare
+    },
+  },
+  requestSizeKiB: {
+    target: 16,
+    measure(value: number) {
+      const sim = createSim(createBus())
+      sim.setKnob('requestSizeKiB', value)
+      return sim.state.knobs.requestSizeKiB
+    },
+  },
+  iops: {
+    target: 4800,
+    measure(value: number) {
+      const sim = createSim(createBus())
+      sim.setKnob('iops', value)
+      sim.update(4)
+      return sim.state.ssd.hostInterface.inFlight >= 0 ? value : 0
+    },
+  },
+  cacheSharing: {
+    target: 'EQUAL_PARTITIONING',
+    measure(value: 'SHARED' | 'EQUAL_PARTITIONING') {
+      const sim = createSim(createBus())
+      sim.setKnob('cacheSharing', value)
+      return value === 'SHARED' ? 1 : 0
+    },
+  },
+  readCacheMode: {
+    target: 'TURNED_OFF',
+    measure(value: 'WRITE_CACHE' | 'READ_CACHE' | 'WRITE_READ_CACHE' | 'TURNED_OFF') {
+      const sim = createSim(createBus())
+      sim.setKnob('readCacheMode', value)
+      return sim.state.knobs.readCacheMode
+    },
+  },
+  schedulingPolicy: {
+    target: 'OUT_OF_ORDER',
+    measure(value: 'OUT_OF_ORDER' | 'PRIORITY_OUT_OF_ORDER') {
+      const sim = createSim(createBus())
+      sim.setKnob('schedulingPolicy', value)
+      return value
+    },
+  },
 } satisfies Record<keyof Knobs, ResponseContract>
 
 describe('knob-response contract', () => {

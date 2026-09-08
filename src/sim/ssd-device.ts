@@ -158,6 +158,14 @@ export class SsdDeviceEngine {
   private readonly knobs: SsdKnobs
   private readonly rng: () => number
   private readonly flowCount: number
+
+  /**
+   * Accepts the city's full Knobs object: the engine reads only the SSD
+   * subset, so callers can pass `DEFAULT_KNOBS` without shaping first.
+   */
+  static from(cityKnobs: SsdKnobs, flowCount: number, seed?: number): SsdDeviceEngine {
+    return new SsdDeviceEngine(cityKnobs, flowCount, seed)
+  }
   private nextRequestId = 1
   /** Requests in device service right now (not queued in an SQ). */
   private readonly inFlight: IoRequestSim[] = []
@@ -170,8 +178,24 @@ export class SsdDeviceEngine {
   /** EMA of per-flow latency while alone, for the fairness ledger. */
   private readonly aloneLatency: Float64Array
 
-  constructor(knobs: SsdKnobs, flowCount: number, seed = 0x555d01) {
-    this.knobs = { ...knobs }
+  constructor(cityKnobs: SsdKnobs, flowCount: number, seed = 0x555d01) {
+    const knobs: SsdKnobs = {
+      queueFetchSize: cityKnobs.queueFetchSize,
+      dataCacheMiB: cityKnobs.dataCacheMiB,
+      cmtCapacityMiB: cityKnobs.cmtCapacityMiB,
+      overprovisioning: cityKnobs.overprovisioning,
+      gcExecThreshold: cityKnobs.gcExecThreshold,
+      gcHardThreshold: cityKnobs.gcHardThreshold,
+      preemptibleGc: cityKnobs.preemptibleGc,
+      writeRatio: cityKnobs.writeRatio,
+      randomShare: cityKnobs.randomShare,
+      requestSizeKiB: cityKnobs.requestSizeKiB,
+      iops: cityKnobs.iops,
+      cacheSharing: cityKnobs.cacheSharing,
+      readCacheMode: cityKnobs.readCacheMode,
+      schedulingPolicy: cityKnobs.schedulingPolicy,
+    }
+    this.knobs = knobs
     this.flowCount = flowCount
     this.rng = makeRng(seed)
     this.state = {
