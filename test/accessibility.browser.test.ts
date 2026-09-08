@@ -26,10 +26,14 @@ describe('keyboard and screen-reader lesson routes', () => {
       path: '/',
       readySelector: '.city-words',
       prepare: `(async () => {
-        for (let attempt = 0; attempt < 120 && !window.SSDSIMCITY; attempt += 1) {
+        for (let attempt = 0; attempt < 120; attempt += 1) {
+          if (window.SSDSIMCITY && document.getElementById('boot')?.classList.contains('done')) break
           await new Promise((resolve) => setTimeout(resolve, 100))
         }
         if (!window.SSDSIMCITY) throw new Error('SSDSimCity did not initialise')
+        if (!document.getElementById('boot')?.classList.contains('done')) {
+          throw new Error('SSDSimCity boot did not finish; touch audit would race finishBoot')
+        }
       })()`,
     }], async ({ accessibilityTree, evaluate, keyPress, page, viewport }) => {
       await keyPress('/', { code: 'Slash' })
