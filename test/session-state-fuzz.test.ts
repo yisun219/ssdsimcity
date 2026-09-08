@@ -181,8 +181,8 @@ describe('persisted session liveness regressions', () => {
       configurable: true,
       value: () => Object.assign(new EventTarget(), { matches: true }),
     })
-    window.localStorage.setItem('pgsimcity.console.open', '1')
-    window.localStorage.setItem('pgsimcity.inspector.open', '1')
+    window.localStorage.setItem('ssdsimcity.console.open', '1')
+    window.localStorage.setItem('ssdsimcity.inspector.open', '1')
     const ctx = context()
 
     const controls = createControls(ctx)
@@ -469,13 +469,13 @@ describe('accumulated persisted-state fuzzer', () => {
         value: () => Object.assign(new EventTarget(), { matches: true }),
       })
       window.localStorage.setItem(THEME_STORAGE_KEY, stored.theme)
-      window.localStorage.setItem('pgsimcity.audio', stored.audio)
-      window.localStorage.setItem('pgsimcity.seen', stored.seen)
-      window.localStorage.setItem('pgsimcity.rotate-hint.dismissed', stored.rotate)
-      window.localStorage.setItem('pgsimcity.console.open', stored.flag)
-      window.localStorage.setItem('pgsimcity.inspector.open', stored.flag)
+      window.localStorage.setItem('ssdsimcity.audio', stored.audio)
+      window.localStorage.setItem('ssdsimcity.seen', stored.seen)
+      window.localStorage.setItem('ssdsimcity.rotate-hint.dismissed', stored.rotate)
+      window.localStorage.setItem('ssdsimcity.console.open', stored.flag)
+      window.localStorage.setItem('ssdsimcity.inspector.open', stored.flag)
       for (const group of KNOB_GROUPS) {
-        window.localStorage.setItem(`pgsimcity.console.group.${group.id}`, stored.flag)
+        window.localStorage.setItem(`ssdsimcity.console.group.${group.id}`, stored.flag)
       }
       window.localStorage.setItem(KNOB_PREFERENCES_STORAGE_KEY, stored.knobs)
 

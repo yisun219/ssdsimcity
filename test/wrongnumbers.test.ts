@@ -139,7 +139,7 @@ describe('readouts agree with their panels', () => {
     )
 
     expect(section?.body).toContain(
-      "PGSimCity uses 60 seconds instead of PostgreSQL's 5-minute default so the cycle is visible; only the checkpoint clock is compressed.",
+      "SSDSimCity uses 60 seconds instead of PostgreSQL's 5-minute default so the cycle is visible; only the checkpoint clock is compressed.",
     )
   })
 

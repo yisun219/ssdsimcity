@@ -44,10 +44,11 @@ Evidence and notes belong to the current attempt; they do not survive a reload.
 ## How much to trust this
 
 **The city is a model, not a real SSD.** Its numbers and timing are scaled to
-make internals observable. It follows the device model of MQSim — Tavakkol et
-al., "MQSim: A Framework for Enabling Realistic Studies of Modern Multi-Queue
-SSD Devices", FAST 2018 — at teaching scale; it is not a cycle-accurate
-simulator and does not benchmark hardware.
+make internals observable. The host side targets the PostgreSQL 18 major line;
+the device follows the MQSim FAST 2018 paper — Tavakkol et al., "MQSim: A
+Framework for Enabling Realistic Studies of Modern Multi-Queue SSD Devices" —
+at teaching scale; it is not a cycle-accurate simulator and does not benchmark
+hardware.
 
 > The host issues large sequential sweeps; the city models PostgreSQL 18's bulk-read strategy with a fixed 32-frame ring so one big scan cannot evict the whole buffer pool. The device below serves whatever the host sends it.
 
