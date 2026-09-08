@@ -1,0 +1,596 @@
+import {
+  SHARED_BUFFERS_MAX_MIB,
+  SHARED_BUFFERS_MIN_MIB,
+} from '../core/types'
+import type { ComponentDoc, Knobs, PgBouncerPoolMode } from '../core/types'
+import { CLAIM_VALUES } from '../core/claims'
+import { DOCS_MEMORY } from './docs-memory'
+import { DOCS_STORAGE } from './docs-storage'
+
+/* ============================================================================
+ * The knowledge layer.
+ *
+ * DOCS_MEMORY  — clients, postmaster, backends, shared memory, the query lab
+ * DOCS_STORAGE — WAL, storage, maintenance processes, replication
+ * ==========================================================================*/
+
+export const DOCS: ComponentDoc[] = [...DOCS_MEMORY, ...DOCS_STORAGE]
+
+const CHECKPOINT_PARTNERS = CLAIM_VALUES.checkpointPolicy.partners
+const POOL_MODE_CLAIM = CLAIM_VALUES.pgBouncerPoolModes
+const POOL_MODE_LABELS: Record<PgBouncerPoolMode, string> = {
+  session: 'session — release after disconnect',
+  transaction: 'transaction — release after transaction',
+  statement: 'statement — release after query',
+}
+const PGBOUNCER_POOL_MODE_OPTIONS = POOL_MODE_CLAIM.modes.map((value) => ({
+  value,
+  label: POOL_MODE_LABELS[value],
+}))
+
+const _byId = new Map<string, ComponentDoc>(DOCS.map((d) => [d.id, d]))
+
+export function doc(id: string | null | undefined): ComponentDoc | undefined {
+  if (!id) return undefined
+  const hit = _byId.get(id)
+  if (hit) return hit
+  // per-instance ids fall back to their family doc: backend.7 -> backend.slot
+  if (/^backend\.\d+$/.test(id)) return _byId.get('backend.slot')
+  if (/^autovac\.worker\.\d+$/.test(id)) return _byId.get('autovac.worker')
+  if (id.startsWith('storage.table.')) return _byId.get('storage.table')
+  if (id.startsWith('storage.index.')) return _byId.get('storage.index')
+  if (id.startsWith('storage.fsm.')) return _byId.get('storage.fsm')
+  if (id.startsWith('storage.vm.')) return _byId.get('storage.vm')
+  return undefined
+}
+
+/** Exact content owner used by correction reports; instance ids resolve first. */
+export function docSource(id: string): string {
+  const entry = doc(id)
+  if (!entry) return `src/ui/content.ts#doc(${id})`
+  const file = DOCS_MEMORY.includes(entry) ? 'docs-memory.ts' : 'docs-storage.ts'
+  return `src/ui/${file}#ComponentDoc[id=${entry.id}]`
+}
+
+export function hasDoc(id: string | null | undefined): boolean {
+  return !!doc(id)
+}
+
+/* ---------------------------------------------------------------------------
+ * Knob metadata — how each dial is rendered, what GUC it stands for, and what
+ * it teaches. The control rail and the inspector both read this.
+ * -------------------------------------------------------------------------*/
+
+export type KnobGroup = 'workload' | 'pooler' | 'memory' | 'wal' | 'checkpoint' | 'vacuum' | 'replication' | 'recovery' | 'chaos' | 'sim'
+
+export interface KnobMeta {
+  key: keyof Knobs
+  label: string
+  /** the real postgresql.conf parameter, if there is one */
+  guc?: string
+  group: KnobGroup
+  kind: 'range' | 'logrange' | 'toggle' | 'select'
+  min?: number
+  max?: number
+  step?: number
+  options?: { value: string; label: string }[]
+  unit?: string
+  /** one line: what moving this actually does inside the engine */
+  hint: string
+  /** format the current value for display */
+  fmt?: (v: never) => string
+  /** flag the settings that make people lose data or sleep */
+  danger?: boolean
+  /** load-bearing qualification marker retained at narrow viewports */
+  disclosure?: string
+}
+
+export const KNOB_GROUPS: { id: KnobGroup; label: string; hint: string }[] = [
+  { id: 'workload', label: 'Workload', hint: 'What the application is asking for' },
+  { id: 'pooler', label: 'Connection pooler', hint: 'Client admission and the PostgreSQL concurrency ceiling' },
+  { id: 'memory', label: 'Memory', hint: 'How much of the database fits in RAM' },
+  { id: 'wal', label: 'Write-ahead log', hint: 'Durability, and what it costs' },
+  { id: 'checkpoint', label: 'Checkpoints', hint: 'Getting dirty pages onto disk' },
+  { id: 'vacuum', label: 'Autovacuum', hint: 'Reclaiming dead rows' },
+  { id: 'replication', label: 'Replication', hint: 'Keeping standby copies' },
+  { id: 'recovery', label: 'Disaster recovery', hint: 'Backups, archive health, retention and PITR' },
+  { id: 'chaos', label: 'Break something', hint: 'The failure modes worth recognising' },
+  { id: 'sim', label: 'Playback', hint: 'Simulation controls' },
+]
+
+function fmtSharedBuffers(mib: number): string {
+  if (mib < 1024) return `${Math.round(mib)} MiB`
+  const gib = mib / 1024
+  return `${Number.isInteger(gib) ? gib.toFixed(0) : gib.toFixed(1)} GiB`
+}
+
+export const KNOB_META: KnobMeta[] = [
+  {
+    key: 'tps',
+    label: 'Transactions / sec',
+    group: 'workload',
+    kind: 'logrange',
+    min: 1,
+    max: 5000,
+    step: 1,
+    unit: 'tps',
+    hint: 'How hard the application hammers the database. Everything downstream scales from here.',
+  },
+  {
+    key: 'clientConnections',
+    label: 'Client connections',
+    group: 'workload',
+    kind: 'logrange',
+    min: 1,
+    max: 2_000,
+    step: 1,
+    unit: 'clients',
+    hint: 'Concurrent application connections beside the aggregate transaction rate. Direct clients compete for max_connections; pooled clients stop at max_client_conn and share fewer PostgreSQL backends. Refused sockets are reported separately and do not silently reduce the tps knob.',
+    disclosure: 'pooler-client-count-scope',
+  },
+  {
+    key: 'poolMode',
+    label: 'pool_mode',
+    guc: 'PgBouncer pool_mode',
+    group: 'pooler',
+    kind: 'select',
+    options: [
+      { value: 'disabled', label: 'direct — no PgBouncer' },
+      ...PGBOUNCER_POOL_MODE_OPTIONS,
+    ],
+    hint: `${CLAIM_VALUES.connectionPooler.poolModeTradeoff} “direct” is SSDSimCity's comparison state, not a PgBouncer pool_mode value. ${CLAIM_VALUES.connectionPooler.coverageDisclosure}`,
+    disclosure: 'pool-mode-cost',
+  },
+  {
+    key: 'defaultPoolSize',
+    label: 'default_pool_size',
+    guc: 'PgBouncer default_pool_size',
+    group: 'pooler',
+    kind: 'range',
+    min: 1,
+    max: 100,
+    step: 1,
+    unit: 'server connections',
+    hint: `Configured server connections for this one modeled user/database pool. This city starts at ${CLAIM_VALUES.connectionPooler.modelDefaultPoolSize}; PgBouncer itself defaults to ${CLAIM_VALUES.connectionPooler.pgBouncerDefaults.defaultPoolSize} per user/database pair. PgBouncer does not coordinate this value with PostgreSQL max_connections, so excess attempts fail.`,
+    disclosure: 'default-pool-size-scope',
+  },
+  {
+    key: 'maxClientConn',
+    label: 'max_client_conn',
+    guc: 'PgBouncer max_client_conn',
+    group: 'pooler',
+    kind: 'logrange',
+    min: 1,
+    max: 2_000,
+    step: 1,
+    unit: 'clients',
+    hint: `Process-wide client admission ceiling. It does not enlarge the PostgreSQL server pool; PgBouncer defaults to ${CLAIM_VALUES.connectionPooler.pgBouncerDefaults.maxClientConn}, and higher values also require enough file descriptors.`,
+    disclosure: 'max-client-conn-scope',
+  },
+  {
+    key: 'queryWaitTimeout',
+    label: 'query_wait_timeout',
+    guc: 'PgBouncer query_wait_timeout',
+    group: 'pooler',
+    kind: 'range',
+    min: 0,
+    max: 600,
+    step: 5,
+    unit: 's',
+    hint: `Disconnect a client whose query has waited this long for a server connection. PgBouncer defaults to ${CLAIM_VALUES.connectionPooler.pgBouncerDefaults.queryWaitTimeoutSeconds} seconds; zero queues indefinitely.`,
+    disclosure: 'query-wait-timeout-semantics',
+  },
+  {
+    key: 'writeRatio',
+    label: 'Writes',
+    group: 'workload',
+    kind: 'range',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    unit: '%',
+    hint: 'Share of statements that modify data. Reads are cheap; writes create WAL, dirty pages and dead tuples.',
+  },
+  {
+    key: 'updateRatio',
+    label: 'Updates vs inserts',
+    group: 'workload',
+    kind: 'range',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    unit: '%',
+    hint: 'An UPDATE in Postgres writes a new row version and leaves the old one behind for vacuum.',
+  },
+  {
+    key: 'seqScanRatio',
+    label: 'Sequential scans',
+    group: 'workload',
+    kind: 'range',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    unit: '%',
+    hint: 'Reads that walk the whole table instead of using an index — watch the buffer cache churn.',
+  },
+  {
+    key: 'sharedBuffers',
+    label: 'shared_buffers',
+    guc: 'shared_buffers',
+    group: 'memory',
+    kind: 'range',
+    min: SHARED_BUFFERS_MIN_MIB,
+    max: SHARED_BUFFERS_MAX_MIB,
+    step: 128,
+    fmt: fmtSharedBuffers,
+    hint: `Postgres's own page cache, sized here in real MiB/GiB. The plaza has capacity for ${CLAIM_VALUES.bufferSample.capacityFrames.toLocaleString('en-US')} representative frames; the default 2 GiB pool activates ${CLAIM_VALUES.bufferSample.defaultActiveFrames}. Each MiB implies 128 8 KiB buffers.`,
+  },
+  {
+    key: 'workMem',
+    label: 'work_mem',
+    guc: 'work_mem',
+    group: 'memory',
+    kind: 'range',
+    min: 1,
+    max: 256,
+    step: 1,
+    unit: 'MiB / node',
+    hint: `Per eligible executor node, never per query or connection. This city prices fixed Sort and HashAggregate nodes; hash nodes receive work_mem × hash_mem_multiplier (${CLAIM_VALUES.workMem.hashMemMultiplier.toFixed(1)} by default since PostgreSQL ${CLAIM_VALUES.workMem.hashMemMultiplierDefaultSince}). Watch private reservoirs, base/pgsql_tmp, temp counters, and the Latency vital when a node spills.`,
+  },
+  {
+    key: 'bgwriterEnabled',
+    label: 'Background writer',
+    group: 'memory',
+    kind: 'toggle',
+    hint: 'Trickles dirty pages out just ahead of the clock sweep so backends rarely have to write a victim themselves. There is no on/off GUC — in Postgres you disable it with bgwriter_lru_maxpages = 0, the slider below; bgwriter_delay only changes how often it wakes.',
+  },
+  {
+    key: 'bgwriterLruMaxpages',
+    label: 'bgwriter_lru_maxpages',
+    guc: 'bgwriter_lru_maxpages',
+    group: 'memory',
+    kind: 'range',
+    min: 0,
+    max: 400,
+    step: 10,
+    unit: 'pages/round',
+    hint: 'Ceiling on how much the background writer may clean per round.',
+  },
+  {
+    key: 'synchronousCommit',
+    label: 'synchronous_commit',
+    guc: 'synchronous_commit',
+    group: 'wal',
+    kind: 'select',
+    options: [
+      { value: 'off', label: 'off — fast, can lose commits' },
+      { value: 'local', label: 'local — fsync here only' },
+      { value: 'remote_write', label: 'remote_write — standby wrote it' },
+      { value: 'on', label: 'on — fsync before ack' },
+      { value: 'remote_apply', label: 'remote_apply — standby applied it' },
+    ],
+    hint: 'Selects the modeled commit-wait path. The Latency vital reports stretched p50/p99 model time and the commit component’s own p99 distribution; PostgreSQL uses this for a real latency/durability trade-off.',
+    danger: true,
+  },
+  {
+    key: 'synchronousStandbyNames',
+    label: 'synchronous_standby_names',
+    guc: 'synchronous_standby_names',
+    group: 'replication',
+    kind: 'select',
+    options: [
+      { value: 'none', label: 'empty — local durability only' },
+      { value: CLAIM_VALUES.standbyNames.internal[0], label: `${CLAIM_VALUES.standbyNames.display[0]} — synchronous` },
+      { value: CLAIM_VALUES.standbyNames.internal[1], label: `${CLAIM_VALUES.standbyNames.display[1]} — synchronous` },
+    ],
+    hint: 'Names one follower as synchronous. Clearing it and reloading releases SyncRep waiters but gives up remote durability; PostgreSQL manual §26.2.8 calls out this availability trade-off.',
+    danger: true,
+  },
+  {
+    key: 'walLevel',
+    label: 'wal_level',
+    guc: 'wal_level',
+    group: 'wal',
+    kind: 'select',
+    options: [
+      { value: 'minimal', label: 'minimal — no replication' },
+      { value: 'replica', label: 'replica — physical standbys' },
+      { value: 'logical', label: 'logical — row-level decoding' },
+    ],
+    hint: 'How much detail goes into the WAL. More detail means more bytes, and more things you can build on it.',
+  },
+  {
+    key: 'fullPageWrites',
+    label: 'full_page_writes',
+    guc: 'full_page_writes',
+    group: 'wal',
+    kind: 'toggle',
+    hint: 'The first write to a page after a checkpoint logs the entire 8 KiB page — protection against torn writes, and the reason WAL volume surges from the moment each checkpoint starts.',
+    danger: true,
+  },
+  {
+    key: CHECKPOINT_PARTNERS[0],
+    label: 'max_wal_size',
+    guc: 'max_wal_size',
+    group: 'checkpoint',
+    kind: 'range',
+    min: 32,
+    max: 2048,
+    step: 32,
+    unit: 'MiB',
+    hint: 'The WAL-volume partner to checkpoint_timeout: crossing the model’s moving budget requests a checkpoint before the timer does.',
+  },
+  {
+    key: CHECKPOINT_PARTNERS[1],
+    label: 'checkpoint_timeout',
+    guc: 'checkpoint_timeout',
+    group: 'checkpoint',
+    kind: 'range',
+    min: 15,
+    max: 600,
+    step: 5,
+    unit: 's',
+    hint: 'Maximum time between checkpoints. Longer means less write amplification but slower crash recovery.',
+  },
+  {
+    key: 'checkpointCompletionTarget',
+    label: 'checkpoint_completion_target',
+    guc: 'checkpoint_completion_target',
+    group: 'checkpoint',
+    kind: 'range',
+    min: 0.1,
+    max: 1,
+    step: 0.05,
+    hint: 'Spreads the checkpoint write phase over this fraction of the interval instead of dumping it all at once.',
+  },
+  {
+    key: 'autovacuum',
+    label: 'autovacuum',
+    guc: 'autovacuum',
+    group: 'vacuum',
+    kind: 'toggle',
+    hint: 'Turn it off and watch dead rows pile up until the tables are mostly corpses. Never do this in production.',
+    danger: true,
+  },
+  {
+    key: 'autovacuumScaleFactor',
+    label: 'autovacuum_vacuum_scale_factor',
+    guc: 'autovacuum_vacuum_scale_factor',
+    group: 'vacuum',
+    kind: 'range',
+    min: 0.01,
+    max: 0.5,
+    step: 0.01,
+    hint: 'A table is vacuumed once this fraction of its rows are dead. Lower means more frequent, cheaper vacuums. PostgreSQL defaults to 0.2; this city starts at 0.02, the kind of per-table setting the docs recommend for a busy relation, so the yard is not idle for a whole visit. This city does not model PostgreSQL 18’s separate autovacuum_vacuum_max_threshold cap.',
+    disclosure: 'autovacuum-max-threshold-scope',
+  },
+  {
+    key: 'standbyAEnabled',
+    label: 'standby_a connected',
+    group: 'replication',
+    kind: 'toggle',
+    hint: 'Whether standby_a is streaming from the primary. Its physical slot remains when this is off and retains WAL.',
+  },
+  {
+    key: 'standbyANetworkLag',
+    label: 'standby_a network',
+    group: 'replication',
+    kind: 'range',
+    min: 0,
+    max: 400,
+    step: 5,
+    unit: 'ms',
+    hint: 'One-way network delay to standby_a. When selected as synchronous, on waits for its flush and remote_apply waits for replay.',
+  },
+  {
+    key: 'standbyASlowApply',
+    label: 'standby_a slow replay',
+    group: 'replication',
+    kind: 'toggle',
+    hint: 'standby_a receives and flushes WAL but its startup process cannot apply it fast enough.',
+  },
+  {
+    key: 'standbyALongQuery',
+    label: 'standby_a long query',
+    group: 'replication',
+    kind: 'toggle',
+    hint: 'A long read on standby_a reports its xmin through hot_standby_feedback and pins cleanup on the primary.',
+    danger: true,
+  },
+  {
+    key: 'standbyBEnabled',
+    label: 'standby_b connected',
+    group: 'replication',
+    kind: 'toggle',
+    hint: 'Whether standby_b is streaming from the primary. Its physical slot remains when this is off and retains WAL.',
+  },
+  {
+    key: 'standbyBNetworkLag',
+    label: 'standby_b network',
+    group: 'replication',
+    kind: 'range',
+    min: 0,
+    max: 400,
+    step: 5,
+    unit: 'ms',
+    hint: 'One-way network delay to standby_b. When selected as synchronous, on waits for its flush and remote_apply waits for replay.',
+  },
+  {
+    key: 'standbyBSlowApply',
+    label: 'standby_b slow replay',
+    group: 'replication',
+    kind: 'toggle',
+    hint: 'standby_b receives and flushes WAL but its startup process cannot apply it fast enough.',
+  },
+  {
+    key: 'standbyBLongQuery',
+    label: 'standby_b long query',
+    group: 'replication',
+    kind: 'toggle',
+    hint: 'A long read on standby_b reports its xmin through hot_standby_feedback and pins cleanup on the primary.',
+    danger: true,
+  },
+  {
+    key: 'walGArchiveCredentialsValid',
+    label: 'WAL-G archive credentials',
+    group: 'recovery',
+    kind: 'toggle',
+    hint: 'Credentials used by wal-g wal-push for S3 object storage. Expired credentials make archive_command return nonzero, so PostgreSQL retries the oldest completed segment while pg_wal grows.',
+    danger: true,
+  },
+  {
+    key: 'backupRetention',
+    label: 'wal-g delete retain FULL',
+    group: 'recovery',
+    kind: 'range',
+    min: 1,
+    max: 5,
+    step: 1,
+    unit: 'full backups',
+    hint: 'Full-backup count passed to WAL-G delete retain FULL. A backup-push runs from standby_a once per 60-second teaching day, then the model runs this retention command with --confirm; expired history cannot be resurrected.',
+  },
+  {
+    key: 'walGDownloadConcurrency',
+    label: 'WALG_DOWNLOAD_CONCURRENCY',
+    group: 'recovery',
+    kind: 'range',
+    min: 1,
+    max: 16,
+    step: 1,
+    unit: 'workers',
+    hint: 'Concurrent WAL-G backup-fetch and wal-fetch workers. Higher concurrency overlaps request latency but can trigger throttling; it does not reduce GET count or request charges.',
+  },
+  {
+    key: 'recoveryTargetAge',
+    label: 'recovery_target_time',
+    group: 'recovery',
+    kind: 'range',
+    min: 0,
+    max: 300,
+    step: 5,
+    unit: 's ago',
+    hint: 'Choose a point before now. PITR fetches the newest retained full backup old enough for that target, then replays archived WAL forward.',
+  },
+  {
+    key: 'recoveryTargetTimeline',
+    label: 'recovery_target_timeline',
+    group: 'recovery',
+    kind: 'select',
+    options: [
+      { value: 'latest', label: 'latest (PostgreSQL 18 default)' },
+      { value: 'current', label: 'current (backup timeline)' },
+    ],
+    hint: `latest may follow 00000002.history from a pre-fork timeline-1 backup into timeline 2. current stays on the backup timeline: it succeeds if that timeline’s archived WAL reaches the selected time, or replays to its archive frontier and reports that the target was not reached. ${CLAIM_VALUES.timelineRecovery.coverageDisclosure}`,
+    disclosure: 'recovery-target-timeline-scope',
+  },
+  {
+    key: 'restoreDrillFault',
+    label: 'Next backup evidence',
+    group: 'recovery',
+    kind: 'select',
+    options: [
+      { value: 'none', label: 'healthy retained objects' },
+      { value: 'empty_other_table', label: 'orders restores empty' },
+      { value: 'corrupt_object', label: 'retained object corrupted' },
+    ],
+    hint: 'Injects an explicit teaching fault into the next modeled full backup so the drill levels can produce different evidence. It is not a PostgreSQL setting and does not change existing retained backups.',
+  },
+  {
+    key: 'haPartition',
+    label: 'HA network partition',
+    group: 'replication',
+    kind: 'select',
+    options: [
+      { value: 'healthy', label: 'healthy — all connected' },
+      { value: 'isolate_node', label: 'isolate primary node' },
+      { value: 'isolate_dcs_majority', label: 'primary with DCS minority' },
+      { value: 'split_dcs', label: 'split DCS — no majority' },
+    ],
+    hint: 'Raft consensus keeps the leader key linearizable. A majority is the commit mechanism; a minority cannot commit a compare-and-swap or renew the lease.',
+    danger: true,
+  },
+  {
+    key: 'walLogHints',
+    label: 'wal_log_hints',
+    guc: 'wal_log_hints',
+    group: 'recovery',
+    kind: 'toggle',
+    hint: 'Records enough full-page information for pg_rewind to find changed blocks when data checksums are off. It must have been enabled before the divergence.',
+    danger: true,
+  },
+  {
+    key: 'oldPrimaryDataIntact',
+    label: 'Former primary data intact',
+    group: 'chaos',
+    kind: 'toggle',
+    hint: 'Whether pg_rewind can still read the former primary’s data directory. If the storage is gone, rebuilding from a base backup is the remaining path.',
+    danger: true,
+  },
+  {
+    key: 'rewindWalRetained',
+    label: 'Divergence WAL retained',
+    group: 'chaos',
+    kind: 'toggle',
+    hint: 'Whether the WAL needed to reach the common checkpoint is still available. Recycled required WAL makes pg_rewind fail.',
+    danger: true,
+  },
+  {
+    key: 'longRunningXact',
+    label: 'Long-running transaction',
+    group: 'chaos',
+    kind: 'toggle',
+    hint: 'One forgotten open transaction pins the xmin horizon, so vacuum can no longer remove row versions whose deleting transaction has not fallen behind it. Bloat forever.',
+    danger: true,
+  },
+  {
+    key: 'lockContention',
+    label: 'Lock contention',
+    group: 'chaos',
+    kind: 'toggle',
+    hint: 'Creates one scripted holder and direct waiters. The city shows occupied slots and attributes blocked model time in the latency tail; it does not model lock-queue fairness.',
+    danger: true,
+  },
+  {
+    key: 'timeScale',
+    label: 'Speed',
+    group: 'sim',
+    kind: 'range',
+    min: 0.1,
+    max: 5,
+    step: 0.1,
+    unit: '×',
+    hint: 'Simulation speed. Slow it down to watch a single commit; speed it up to watch a day of checkpoints.',
+  },
+  {
+    key: 'paused',
+    label: 'Pause',
+    group: 'sim',
+    kind: 'toggle',
+    hint: 'Freeze the city mid-flight and fly around it.',
+  },
+]
+
+const _knobById = new Map<string, KnobMeta>(KNOB_META.map((k) => [k.key as string, k]))
+
+export function knobMeta(key: keyof Knobs): KnobMeta | undefined {
+  return _knobById.get(key as string)
+}
+
+export function knobsInGroup(group: KnobGroup): KnobMeta[] {
+  return KNOB_META.filter((k) => k.group === group)
+}
+
+/* ---------------------------------------------------------------------------
+ * Tiny markdown: **bold**, `code`, *em*, [text](url). Escapes HTML first, so it
+ * is safe to feed it doc strings.
+ * -------------------------------------------------------------------------*/
+
+export function mdToHtml(src: string): string {
+  const esc = src.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return esc
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+    .replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+    .replace(/\n\n/g, '<br><br>')
+}

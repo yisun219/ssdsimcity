@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A one-screen psql workbench and layered PostgreSQL architecture machine."
+    />
+    <title>The Machine — SSDSimCity</title>
+<!-- Privacy-friendly analytics by Plausible -->
+<script async src="https://plausible.io/js/pa-8M-ssImnj4YBtK34iZRwy.js"></script>
+<script>
+  window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+  plausible.init()
+</script>
+
+    <link rel="icon" href="../machine-favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="../machine-favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="../machine-favicon-180.png" sizes="180x180" />
+    <link rel="stylesheet" href="./magnum.css" />
+  </head>
+  <body>
+    <main class="workbench">
+      <section
+        class="console-pane"
+        data-correction-subject="machine-workbench"
+        aria-label="PostgreSQL controls and psql terminal"
+      >
+        <header class="console-header">
+          <div>
+            <p class="eyebrow">SSDSIMCITY / MACHINE ROOM 01</p>
+            <h1>THE MACHINE</h1>
+            <p class="deck">
+              REAL POSTGRESQL LEFT VIA
+              <a
+                href="https://pglite.dev"
+                target="_blank"
+                rel="noopener"
+              >PGLITE BY ELECTRICSQL</a>
+              — POSTGRESQL COMPILED TO WEBASSEMBLY.
+              <a
+                href="https://github.com/electric-sql/pglite"
+                target="_blank"
+                rel="noopener"
+              >SOURCE</a>.
+              THE CITY'S ARCHITECTURE + MODELLED INTERIOR RIGHT.
+            </p>
+            <details
+              id="machine-version-provenance"
+              class="machine-provenance"
+              data-version-qualification="machine"
+            >
+              <summary data-disclosure="machine-postgresql-version">PostgreSQL 18.6 model · PGlite 18.3 engine</summary>
+              <span data-version-qualification-full="true">Model and explanations: PostgreSQL 18.6 · PGlite engine: PostgreSQL 18.3 (PGlite 0.5.4), checked separately with SELECT version().</span>
+            </details>
+          </div>
+          <div class="header-side">
+            <nav class="machine-nav" aria-label="Machine room navigation">
+              <a href="../" data-mode-exit="machine-room">← Back to city</a>
+              <button id="index-walk-open" type="button">START HERE</button>
+              <details class="machine-legal">
+                <summary>Legal</summary>
+                <p>
+                  SSDSimCity is an independent, non-commercial educational visualization of
+                  PostgreSQL internals. It is not affiliated with, sponsored, endorsed, or approved
+                  by Electronic Arts Inc. SimCity is a trademark of Electronic Arts Inc.
+                  <span class="machine-legal__credit">
+                    <a href="https://pglite.dev" target="_blank" rel="noopener">PGlite</a>
+                    is by ElectricSQL (Electric DB Limited), copyright Electric DB Limited and
+                    licensed under Apache-2.0. It contains PostgreSQL code compiled to WebAssembly;
+                    PostgreSQL and modifications to it are distributed under the PostgreSQL License.
+                    <a
+                      href="https://github.com/electric-sql/pglite"
+                      target="_blank"
+                      rel="noopener"
+                    >Source</a>.
+                  </span>
+                </p>
+              </details>
+            </nav>
+            <div class="source-key" aria-label="Data source key">
+              <span><b class="source-medallion postgres-source" role="img" aria-label="PostgreSQL source">P</b> POSTGRESQL REPORT</span>
+              <span><b class="source-medallion model-source" role="img" aria-label="Modelled source">M</b> MODELLED RHYTHM</span>
+            </div>
+          </div>
+        </header>
+
+        <section class="control-rack" aria-label="Machine controls">
+          <div class="postgres-control">
+            <button id="postgres-toggle" type="button">START POSTGRESQL (P)</button>
+            <span id="postgres-status">NOT LOADED · FIRST QUERY MAY START IT</span>
+          </div>
+          <div class="clock-control">
+            <button id="comparison-open" type="button">COMPARE</button>
+            <button id="machine-toggle" type="button">PAUSE</button>
+            <button id="machine-reset" type="button">RESET</button>
+            <output id="clock">00.0 / 36s MODEL</output>
+            <div class="viewing-rate" role="group" aria-label="Viewing speed">
+              <button
+                id="machine-slower"
+                type="button"
+                title="Slower viewing speed (,)"
+                aria-label="Slower viewing speed"
+              >‹</button>
+              <output
+                id="machine-rate"
+                aria-live="polite"
+                title="Viewing speed changes ambient motion and automatic statement replay, never model periods or PostgreSQL measurements"
+              >VIEW 1×</output>
+              <button
+                id="machine-faster"
+                type="button"
+                title="Faster viewing speed (.)"
+                aria-label="Faster viewing speed"
+              >›</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="terminal" aria-label="psql terminal">
+          <header class="terminal-header">
+            <span class="terminal-lamps" aria-hidden="true"><i></i><i></i><i></i></span>
+            <strong>
+              PSQL /
+              <a href="https://pglite.dev" target="_blank" rel="noopener">PGLITE BY ELECTRICSQL</a>
+              · SINGLE CONNECTION
+            </strong>
+            <span id="terminal-state">OFFLINE</span>
+          </header>
+          <div id="terminal-transcript" class="terminal-transcript" role="log" aria-label="psql transcript" aria-live="polite" aria-relevant="additions text">
+            <pre class="terminal-banner">psql workbench
+Type SQL directly. Up/Down recalls history.
+Available: \d  \dt  \d+ table  \timing
+IN-MEMORY, SINGLE-CONNECTION RUNTIME.
+NO CONCURRENCY, LOCK CONTENTION, REPLICATION, STANDBY, OR REAL DEVICE I/O.
+EACH SUBMITTED STATEMENT EXECUTES ONCE; DISPLAYED ROWS COME FROM THAT EXECUTION.</pre>
+          </div>
+          <form id="terminal-form" class="terminal-entry">
+            <label id="terminal-prompt" for="terminal-input">ssdsimcity=#</label>
+            <textarea
+              id="terminal-input"
+              rows="1"
+              spellcheck="false"
+              autocomplete="off"
+              aria-label="psql command"
+              placeholder="SELECT id, balance FROM accounts WHERE id = 42;"
+            ></textarea>
+          </form>
+        </section>
+
+        <footer class="measurement-rack">
+          <div id="postgres-measurement" class="postgres-measurement">
+            <span>QUERY ARM REACH</span>
+            <strong>MODELLED UNTIL POSTGRESQL REPORTS BUFFERS</strong>
+          </div>
+          <p>ENTER RUNS · SHIFT+ENTER ADDS A LINE · SPACE ON THE BOARD PAUSES · , / . CHANGES VIEW SPEED</p>
+        </footer>
+      </section>
+
+      <section
+        class="architecture-pane"
+        data-correction-subject="machine-architecture-board"
+        aria-label="PostgreSQL architecture"
+      >
+        <div class="architecture-scroll">
+          <div class="architecture-stage">
+            <canvas
+              id="machine"
+              width="720"
+              height="900"
+              tabindex="0"
+              aria-describedby="machine-stage-status"
+              aria-label="A layered PostgreSQL architecture: client and processes above one shared memory segment, backend private memory outside it, then the kernel page cache and durable disk."
+            ></canvas>
+          </div>
+        </div>
+        <div class="architecture-readout">
+          <button
+            id="board-view"
+            type="button"
+            aria-pressed="false"
+            title="Fit the whole board on screen"
+          >FIT BOARD</button>
+          <button
+            id="board-follow"
+            type="button"
+            aria-pressed="true"
+            title="Automatically keep the active statement stage in view"
+          >FOLLOW: ON</button>
+          <button
+            id="statement-mode"
+            type="button"
+            aria-pressed="false"
+            title="Toggle between automatic playback and one-stage-at-a-time playback"
+          >TRACE: AUTO</button>
+          <button id="statement-next" type="button" disabled>NEXT STAGE</button>
+          <span id="statement-state">NO STATEMENT</span>
+          <span id="run-state">VIEW RUNNING</span>
+        </div>
+        <p
+          id="machine-stage-status"
+          class="sr-only"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >Architecture board ready. No statement is running.</p>
+      </section>
+
+      <p class="fallback">This prototype needs a browser with Canvas 2D support.</p>
+
+      <section
+        id="index-walk"
+        class="index-walk"
+        data-correction-subject="machine-index-walk"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="index-walk-title"
+        aria-describedby="index-walk-sequence index-walk-model index-walk-comparison"
+        hidden
+      >
+        <header class="index-walk__header">
+          <div id="index-walk-intro">
+            <p class="eyebrow" data-disclosure="index-walk-source">P SEQUENCE / M BOARD REPLAYS</p>
+            <h2 id="index-walk-title">FROM SELECT 1 TO AN ACCESS PATH</h2>
+            <p>Four real PostgreSQL reports show why a partial index is a path for some queries, not every query on its column.</p>
+          </div>
+          <div class="index-walk__header-actions">
+            <span id="index-walk-status" aria-live="polite">READY · 0/4</span>
+            <button id="index-walk-close" type="button">CLOSE</button>
+          </div>
+        </header>
+
+        <div id="index-walk-steps" class="index-walk__steps">
+          <button type="button" data-index-walk-step="constant">
+            <span class="index-walk__number">01</span>
+            <span class="index-walk__copy">
+              <b>START WITHOUT A TABLE</b>
+              <code>SELECT 1;</code>
+              <small>A result can exist before any relation access.</small>
+            </span>
+            <output data-index-walk-result="constant">RUN FIRST</output>
+          </button>
+          <button type="button" data-index-walk-step="catalog" disabled>
+            <span class="index-walk__number">02</span>
+            <span class="index-walk__copy">
+              <b>ASK THE CATALOGS</b>
+              <code>pg_index + pg_get_indexdef</code>
+              <small>Read the indexed path PostgreSQL says exists.</small>
+            </span>
+            <output data-index-walk-result="catalog">LOCKED</output>
+          </button>
+          <button type="button" data-index-walk-step="indexed" disabled>
+            <span class="index-walk__number">03</span>
+            <span class="index-walk__copy">
+              <b>USE THE INDEXED COLUMN</b>
+              <code>WHERE id = 42</code>
+              <small>See whether EXPLAIN reports accounts_pkey.</small>
+            </span>
+            <output data-index-walk-result="indexed">LOCKED</output>
+          </button>
+          <button type="button" data-index-walk-step="unindexed" disabled>
+            <span class="index-walk__number">04</span>
+            <span class="index-walk__copy">
+              <b>OMIT THE PARTIAL-INDEX PREDICATE</b>
+              <code>WHERE owner = 'account-42'</code>
+              <small>The owner index requires the query to imply balance &gt; 0.</small>
+            </span>
+            <output data-index-walk-result="unindexed">LOCKED</output>
+          </button>
+        </div>
+
+        <footer id="index-walk-footer" class="index-walk__footer">
+          <div id="index-walk-finding" class="index-walk__finding" aria-describedby="index-walk-sequence index-walk-model index-walk-comparison" hidden>
+            <span><b class="source-medallion postgres-source" role="img" aria-label="PostgreSQL source">P</b> MEASURED FINDING</span>
+            <strong id="index-walk-finding-text"></strong>
+          </div>
+          <div id="index-walk-disclosures" class="index-walk__disclosures">
+            <p id="index-walk-sequence" data-disclosure="index-walk-sequence"></p>
+            <p id="index-walk-model" data-disclosure="index-walk-model"></p>
+            <p id="index-walk-comparison" data-disclosure="index-walk-comparison"></p>
+          </div>
+          <button id="index-walk-reset" type="button">RESET WALK</button>
+        </footer>
+      </section>
+
+      <section
+        id="comparison"
+        class="comparison"
+        data-correction-subject="machine-comparison"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="comparison-title"
+        aria-describedby="comparison-pglite-disclosure comparison-replay-disclosure"
+        hidden
+      >
+        <header class="comparison-header">
+          <div>
+            <p class="eyebrow" data-disclosure="comparison-framing">DOCUMENTED BEHAVIOUR / MODELLED REPLAY</p>
+            <h2 id="comparison-title">ONE P EXECUTION. TWO M COMMIT POLICIES.</h2>
+            <div
+              class="comparison-source-key"
+              data-disclosure="comparison-source-key"
+              aria-label="Data source key"
+            >
+              <span><b class="source-medallion postgres-source" role="img" aria-label="PostgreSQL source">P</b> POSTGRESQL EXECUTION</span>
+              <span><b class="source-medallion model-source" role="img" aria-label="Modelled source">M</b> MODELLED REPLAY</span>
+            </div>
+          </div>
+          <div class="comparison-header__actions">
+            <span id="comparison-status" aria-live="polite">READY</span>
+            <button id="comparison-close" type="button">CLOSE</button>
+          </div>
+        </header>
+
+        <section id="comparison-proof" class="comparison-proof" aria-label="Comparison finding" aria-describedby="comparison-pglite-disclosure">
+          <div class="comparison-proof__verdict">
+            <span data-disclosure="comparison-finding-source"><b class="source-medallion model-source" role="img" aria-label="Modelled source">M</b> MODELLED FINDING</span>
+            <strong id="comparison-finding"></strong>
+            <small
+              id="comparison-pglite-disclosure"
+              data-disclosure="comparison-pglite-limitation"
+            ></small>
+          </div>
+          <div class="comparison-contract">
+            <p data-disclosure="comparison-modelled-setting"><b>MODELLED</b> <code>synchronous_commit</code>: <code>on</code> vs <code>off</code></p>
+            <p data-disclosure="comparison-held-constant"><b>HELD</b> SQL · ONE P REPORT · PLAN · BUFFERS · ROUTE · VIEW PACE · NO SYNC STANDBY</p>
+            <code id="comparison-sql">UPDATE accounts SET updated_at = updated_at WHERE id = 42;</code>
+          </div>
+          <div class="comparison-timeline" aria-label="Aligned commit acknowledgement timeline">
+            <p data-disclosure="comparison-pace-limitation">ALIGNED COMMIT WINDOW · VIEW PACE, NOT LATENCY</p>
+            <div class="comparison-timeline__row" data-lane="a">
+              <b>A · ON</b>
+              <span class="comparison-timeline__same">SAME ROUTE</span>
+              <span class="comparison-timeline__wait">M · WAIT FOR LOCAL FLUSH</span>
+              <span class="comparison-timeline__ack">ACK</span>
+            </div>
+            <div class="comparison-timeline__row" data-lane="b">
+              <b>B · OFF</b>
+              <span class="comparison-timeline__same">SAME ROUTE</span>
+              <span class="comparison-timeline__early">ACK</span>
+              <span class="comparison-timeline__flush">LOSS WINDOW UNTIL FLUSH</span>
+              <span class="comparison-timeline__done">DONE</span>
+            </div>
+          </div>
+        </section>
+
+        <nav class="comparison-tabs" aria-label="Choose comparison board">
+          <button type="button" data-comparison-lane="a" aria-pressed="true">A · ON</button>
+          <button type="button" data-comparison-lane="b" aria-pressed="false">B · OFF</button>
+        </nav>
+
+        <div class="comparison-lanes">
+          <article class="comparison-board" data-lane="a" aria-label="Modelled replay board: synchronous_commit on">
+            <header>
+              <span class="comparison-board__letter">A</span>
+              <div>
+                <b>MODELLED ON POLICY</b>
+                <code>synchronous_commit = on</code>
+              </div>
+              <span
+                class="comparison-board__phase"
+                data-comparison-phase="a"
+                data-disclosure="comparison-phase-a"
+              >READY</span>
+            </header>
+            <p data-disclosure="comparison-on-source"><b class="source-medallion postgres-source" role="img" aria-label="PostgreSQL source">P</b> SAME POSTGRESQL REPORT <b class="source-medallion model-source" role="img" aria-label="Modelled source">M</b> WAITS FOR LOCAL WAL FLUSH</p>
+            <div class="comparison-board__viewport">
+              <canvas
+                id="comparison-board-a"
+                width="720"
+                height="740"
+                aria-label="Run A architecture board, with synchronous_commit on and a modelled local WAL flush wait."
+              ></canvas>
+            </div>
+          </article>
+          <article class="comparison-board" data-lane="b" aria-label="Modelled replay board: synchronous_commit off">
+            <header>
+              <span class="comparison-board__letter">B</span>
+              <div>
+                <b>MODELLED OFF POLICY</b>
+                <code>synchronous_commit = off</code>
+              </div>
+              <span
+                class="comparison-board__phase"
+                data-comparison-phase="b"
+                data-disclosure="comparison-phase-b"
+              >READY</span>
+            </header>
+            <p data-disclosure="comparison-off-source"><b class="source-medallion postgres-source" role="img" aria-label="PostgreSQL source">P</b> SAME POSTGRESQL REPORT <b class="source-medallion model-source" role="img" aria-label="Modelled source">M</b> <span data-comparison-note="b">EARLY ACK; CRASH CAN LOSE RECENT ACKS UNTIL WAL FLUSH</span></p>
+            <div class="comparison-board__viewport">
+              <canvas
+                id="comparison-board-b"
+                width="720"
+                height="740"
+                aria-label="Run B architecture board, with synchronous_commit off and a modelled early acknowledgement whose recent acknowledged commits can be lost in a crash before WAL flush."
+              ></canvas>
+            </div>
+          </article>
+        </div>
+
+        <footer class="comparison-actions">
+          <button id="comparison-run" type="button">RUN MODELLED REPLAY</button>
+          <button id="comparison-continue" type="button" hidden>CONTINUE AFTER FINDING</button>
+          <span
+            id="comparison-replay-disclosure"
+            data-disclosure="comparison-replay-limitation"
+          ></span>
+        </footer>
+      </section>
+    </main>
+    <script type="module" src="./magnum.js"></script>
+  </body>
+</html>

@@ -1,0 +1,56 @@
+{
+  "name": "ssdsimcity",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "license": "Apache-2.0",
+  "description": "An independent, non-commercial educational visualization of modern multi-queue SSD internals, modeled on MQSim (FAST 2018). Fork-style derivative of PGSimCity.",
+  "author": "yisun219",
+  "homepage": "https://yisun219.github.io/ssdsimcity/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yisun219/ssdsimcity.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yisun219/ssdsimcity/issues"
+  },
+  "keywords": [
+    "ssd",
+    "nvme",
+    "flash",
+    "simulator",
+    "visualization",
+    "3d",
+    "threejs",
+    "mqsim",
+    "storage",
+    "education",
+    "webgl"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "bake:light": "node tools/bake-indirect.mjs",
+    "build": "vite build",
+    "mutation": "node tools/mutation-gate.mjs",
+    "oracle": "node tools/pg-oracle.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:input-fuzz": "vitest run test/input-fuzz.browser.test.ts --maxWorkers=1",
+    "test:layout": "node tools/verify-hud-layout.mjs",
+    "test:watch": "vitest",
+    "preview": "vite preview --port 4173"
+  },
+  "devDependencies": {
+    "@types/three": "^0.185.0",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.5",
+    "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.4",
+    "three": "^0.185.0"
+  }
+}

@@ -1,0 +1,76 @@
+# Contributing to PGSimCity
+
+Thanks for helping make PostgreSQL internals understandable and accurate.
+
+## Start here
+
+- Read [README.md](README.md) for the product and architecture overview.
+- Read [CLAUDE.md](CLAUDE.md). It is the source of truth for engineering,
+  style, terminology, visual accuracy, and review rules.
+- Keep changes focused and preserve the simulation/world boundary.
+
+## Development
+
+Node.js `^20.19.0 || >=22.12.0` is required.
+
+```bash
+npm install
+npm run dev        # http://localhost:5173/
+npm test           # full suite, including Chrome tests
+npm run test:watch # rerun affected tests while editing
+npm run oracle     # compare registered claims with PostgreSQL 18
+```
+
+The oracle starts and removes its own throwaway cluster. It requires the target
+major's server binaries at `/usr/lib/postgresql/18/bin`; it never substitutes a
+different PostgreSQL major or silently runs without a server.
+
+The full `npm test` suite requires `google-chrome` on `PATH`. Set `CHROME_BIN`
+to select another Chrome or Chromium executable. Contributors without Chrome
+can run the deterministic fast lane while editing:
+
+```bash
+npm test -- --exclude '**/*.browser.test.*'
+```
+
+Tests that launch real Chrome use the `*.browser.test.*` filename convention.
+CI provisions Chrome for that separately gating lane; all other tests remain in
+the faster always-gating lane. Run the unfiltered suite before opening a pull
+request.
+
+Before opening a pull request:
+
+```bash
+npm test
+npm run typecheck
+npm run build
+```
+
+## Bug fixes use red/green TDD
+
+Every bug fix starts with a failing automated test that reproduces the defect.
+The source fix is the change that turns that test green. **No test, no fix.**
+
+This is mandatory because PGSimCity lost the same Slonik plate shape across
+four commits. A property-based characterization test would have identified the
+breaking commit immediately and prevented the regression from landing silently.
+CI runs `npm test` and rejects a change if any test is red.
+
+1. Add the smallest deterministic test that demonstrates the bug.
+2. Run it and confirm that it fails for the expected reason.
+3. Fix the source; do not weaken the assertion.
+4. Run the full verification commands above.
+
+Tests should assert behavior or a meaningful property, not a large snapshot.
+Keep pure simulation and geometry tests independent of browsers, GPUs,
+wall-clock timing, and unseeded randomness.
+
+## Pull requests
+
+- Keep one logical fix or feature per pull request.
+- Explain the motivation, user-visible effect, and verification performed.
+- Use Conventional Commits with a truthful, present-tense subject under 50
+  characters.
+- For visible changes, include and inspect before/after screenshots.
+- Do not merge until CI is green, substantive review is complete, and the
+  changed behavior has been exercised manually.

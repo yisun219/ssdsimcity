@@ -1,0 +1,1068 @@
+import '../styles/panel.css'
+
+import { destinationForId } from '../core/destinations'
+import { CLAIM_VALUES } from '../core/claims'
+import { createCorrectionPath, displayedClaim } from '../core/corrections'
+import type { ComponentDef, ComponentDoc, ComponentKind, DocRef, DocReferences, Knobs, RestoreDrillLevel, SimState } from '../core/types'
+import { fmtBytes, fmtDuration } from '../core/util'
+import { doc, docSource, knobMeta, mdToHtml } from './content'
+import {
+  SHEET_EVENT,
+  announceSheet,
+  createCollapse,
+  createKnobControl,
+  loadFlag,
+  saveFlag,
+  sheetSideOf,
+  syncSheetFlags,
+} from './controls'
+import type { KnobControl } from './controls'
+import { MODE_SURFACES, setModeSurface } from './mode-exits'
+import { clear, el, icon, metricTile, setClass, setText } from './uikit'
+import type { UiContext, UiModule } from './uikit'
+
+/* ============================================================================
+ * SSDSimCity — the inspector (#hud-right).
+ *
+ * One component at a time: what it is, what it is doing right now, and the
+ * dials that change its behaviour. Live numbers sit above the prose because
+ * they are the reason any of the prose is interesting.
+ * ==========================================================================*/
+
+/** Metric + readout refresh rate. Text at 6 Hz reads as continuous. */
+const TICK = 1 / 6
+
+const SUGGESTIONS = ['shared.buffers', 'checkpointer', 'autovac.worker.0', 'replica.standby']
+
+const OPEN_KEY = 'ssdsimcity.inspector.open'
+
+/* ---------------------------------------------------------------------------
+ * Kind badge. The registry is authoritative; this is the fallback for docs
+ * that describe an idea rather than a registered object.
+ * -------------------------------------------------------------------------*/
+
+const KIND_HINTS: [RegExp, ComponentKind][] = [
+  [/^client\.|^conn\./, 'client'],
+  [/localmem|^shmem|^shared\.|^buf\.|^proc\.array|^clog|^wal\.buffers|^os\.cache/, 'memory'],
+  [
+    /^postmaster|^backend\.|^autovac\.|^checkpointer|^bgwriter|^walwriter|^archiver|^startup|^walsender|^walreceiver|^logical\.decoder|^stats\./,
+    'process',
+  ],
+  [/^storage|^disk|^archive|^landfill|^wal\.vault|^replica\.storage/, 'storage'],
+  [/^net\.|^replica|^subscriber|^stream/, 'network'],
+]
+
+function inferKind(id: string): ComponentKind {
+  for (const [re, kind] of KIND_HINTS) if (re.test(id)) return kind
+  return 'concept'
+}
+
+const hex6 = (c: number): string => `#${(c >>> 0).toString(16).padStart(6, '0').slice(-6)}`
+
+/* ---------------------------------------------------------------------------
+ * Prose. mdToHtml handles the inline marks; paragraphs are real elements so
+ * they can have real spacing.
+ * -------------------------------------------------------------------------*/
+
+function proseBody(text: string): HTMLElement {
+  const wrap = el('div', { class: 'pg-body pgc-prose' })
+  for (const para of text.split(/\n{2,}/)) {
+    const t = para.trim()
+    if (t) wrap.append(el('p', { class: 'pgc-p', html: mdToHtml(t) }))
+  }
+  return wrap
+}
+
+type AnatomyView = 'page' | 'directory'
+
+function discussesPageLayout(id: string, heading: string, body: string, sectionIndex: number): boolean {
+  if ((id.startsWith('storage.table.') || id.startsWith('storage.index.')) && sectionIndex === 0) return true
+  const copy = `${heading} ${body}`
+  return /\b(?:page layout|8\s*KiB\s+pages?)\b/i.test(copy)
+}
+
+function inspectorCorrectionContext(
+  id: string,
+  info: ComponentDoc | undefined,
+  state: SimState,
+): readonly (readonly [string, string])[] {
+  if (id === 'recovery.ground') {
+    const drill = state.disasterRecovery.drill
+    const active = drill.status === 'restoring'
+      || drill.status === 'verifying'
+      || drill.status === 'querying'
+    const verdict = drill.status === 'failed' && drill.failureReason
+      ? `failed — ${drill.failureReason}`
+      : drill.status
+    const level = drill.status === 'idle'
+      ? 'not run'
+      : `${CLAIM_VALUES.restoreDrill.levels[drill.level].label} (${drill.level})`
+    const restoreTime = drill.measuredRestoreToTargetSec > 0
+      ? `${fmtDuration(drill.measuredRestoreToTargetSec)} measured`
+      : active
+        ? `${fmtDuration(drill.estimatedRestoreToTargetSec)} estimated`
+        : 'not measured'
+    return [
+      ['Drill verdict', verdict],
+      ['Drill level', level],
+      ['Restore-to-target time', restoreTime],
+      ['recoveryTargetAge', `${state.knobs.recoveryTargetAge} s`],
+      ['walGDownloadConcurrency', `${state.knobs.walGDownloadConcurrency} workers`],
+    ]
+  }
+
+  const keys = [...new Set(info?.knobs ?? [])]
+  return keys.map((key) => [String(key), String(state.knobs[key])] as const)
+}
+
+/* ---------------------------------------------------------------------------
+ * References — the reading list behind each component.
+ *
+ * Everything here is checkable: a manual page, a file in the PostgreSQL tree, a
+ * chapter of a book. That is the whole point, so the renderer never dresses up
+ * a reference as something it is not. No URL means no link.
+ * -------------------------------------------------------------------------*/
+
+/** One reference line. A link only when there is a real URL to link to. */
+function refLine(r: DocRef): HTMLElement {
+  const li = el('li', { class: 'pgc-src__i pgc-ref' })
+  li.append(
+    r.url
+      ? el('a', { class: 'pgc-ref__a', href: r.url, target: '_blank', rel: 'noopener noreferrer', text: r.label })
+      : el('span', { class: 'pgc-ref__t', text: r.label }),
+  )
+  if (r.symbol) li.append(document.createTextNode(' '), el('span', { class: 'pgc-ref__sym pg-mono', text: r.symbol }))
+  if (r.verified === false) {
+    const dagger = el('span', { class: 'pgc-ref__unver', text: ' †' })
+    dagger.title = 'the link is good; the section or chapter number has not been re-checked'
+    li.append(dagger)
+  }
+  return li
+}
+
+/**
+ * One labelled group. Everything else is borrowed from the "In the source"
+ * block's classes so the two read as the same object; the one inline rule is
+ * the gap between groups, which belongs in `.pgc-ref__g` in panel.css the next
+ * time that file is open.
+ */
+function refGroup(heading: string, items: HTMLElement[]): HTMLElement | null {
+  if (!items.length) return null
+  return el(
+    'div',
+    { class: 'pgc-ref__g', style: { marginTop: '10px' } },
+    el('span', { class: 'pg-eyebrow', text: heading }),
+    el('ul', { class: 'pgc-src pgc-ref__list' }, ...items),
+  )
+}
+
+function renderRefs(refs: DocReferences): HTMLElement | null {
+  const groups: (HTMLElement | null)[] = [
+    refGroup('Documentation', (refs.docs ?? []).map(refLine)),
+    refGroup('Source', (refs.source ?? []).map(refLine)),
+    refGroup(
+      'The Internals of PostgreSQL',
+      refs.suzuki ? [refLine({ ...refs.suzuki, label: `ch. ${refs.suzuki.chapter} — ${refs.suzuki.label}` })] : [],
+    ),
+  ]
+
+  // Rogov: "PostgreSQL 14 Internals" is a book. The reference apparatus supplies
+  // NO url for it, by explicit instruction, because there is no canonical public
+  // page for a chapter — inventing one would be a fabricated citation. Render it
+  // as plain text, never as an <a>. Do not "helpfully" add a link here later.
+  if (refs.rogov) {
+    const r = refs.rogov
+    const line = el(
+      'li',
+      { class: 'pgc-src__i pgc-ref' },
+      el('span', { class: 'pgc-ref__t', text: r.edition }),
+      el('br'),
+      el('span', { class: 'pgc-ref__t', text: `${r.part} · ${r.chapter}` }),
+    )
+    if (r.confidence) line.title = `confidence: ${r.confidence}`
+    groups.push(refGroup('In print', [line]))
+  }
+
+  const kept = groups.filter((g): g is HTMLElement => g != null)
+  if (!kept.length) return null
+
+  const block = el('div', { class: 'pgc-block pgc-block--refs' }, el('span', { class: 'pg-eyebrow', text: 'Go deeper' }))
+  const body = el('div', { class: 'pg-body' }, ...kept)
+  block.append(body)
+  return block
+}
+
+/* ===========================================================================
+ * createInspector
+ * =========================================================================*/
+
+export function createInspector(ctx: UiContext): UiModule {
+  const mount = document.getElementById('hud-right')
+  if (!mount) {
+    console.warn('[SSDSimCity] #hud-right is missing — the inspector has nowhere to live')
+    return { update() {}, dispose() {} }
+  }
+
+  const host = el('div', { class: 'pgc-host pgc-host--right' })
+
+  /* --- header ------------------------------------------------------------ */
+
+  const kindBadge = el('span', { class: 'pgc-kind' })
+  const title = el('h2', {
+    class: 'pg-title pgc-insp__title',
+    id: 'pgc-inspector-title',
+    text: 'Nothing selected',
+    'aria-live': 'polite',
+    'aria-atomic': 'true',
+  })
+  const subtitle = el('p', { class: 'pg-sub pgc-insp__sub', text: 'Click a building to open it up' })
+  const readout = el('p', { class: 'pgc-readout' })
+
+  const flyBtn = el(
+    'button',
+    {
+      class: 'pg-btn pgc-fly',
+      type: 'button',
+      title: 'Fly the camera to this component',
+      on: { click: () => currentId && ctx.bus.emit('focus', { id: currentId }) },
+    },
+    icon('camera', 13),
+    el('span', { text: 'Fly to' }),
+  )
+
+  const closeBtn = el(
+    'button',
+    {
+      class: 'pg-btn pg-btn--icon pgc-insp__close',
+      type: 'button',
+      title: 'Close the inspector',
+      'aria-label': 'Close the inspector',
+      on: {
+        click: () => {
+          ctx.bus.emit('select', { id: null })
+          setOpen(false)
+          tab.focus()
+        },
+      },
+    },
+    icon('close', 13),
+  )
+
+  /* Phone only: the sheet keeps the bottom 42% by default so the city keeps the
+     rest. This buys the other 40% when you are reading rather than exploring. */
+  const sizeBtn = el(
+    'button',
+    {
+      class: 'pg-btn pg-btn--icon pgc-sheet-size',
+      type: 'button',
+      title: 'Expand the inspector',
+      'aria-label': 'Expand the inspector',
+      'aria-expanded': 'false',
+      on: { click: () => setTall(!tall) },
+    },
+    icon('chevron', 13),
+  )
+
+  const head = el(
+    'header',
+    { class: 'pg-panel__head pgc-insp__head' },
+    el(
+      'div',
+      { class: 'pgc-insp__top' },
+      kindBadge,
+      el('span', { class: 'pgc-spacer' }),
+      sizeBtn,
+      flyBtn,
+      closeBtn,
+    ),
+    title,
+    subtitle,
+    readout,
+  )
+
+  /* --- body -------------------------------------------------------------- */
+
+  const body = el('div', { class: 'pg-panel__body pg-scroll pgc-insp__body', tabindex: '0' })
+  body.dataset.analyticsPanel = 'inspector'
+  body.setAttribute('role', 'region')
+  body.setAttribute('aria-label', 'Component notes')
+
+  const panel = el('section', {
+    class: 'pg-panel pgc-panel pgc-insp',
+    id: 'pgc-inspector-panel',
+    'aria-labelledby': 'pgc-inspector-tab pgc-inspector-title',
+  }, head, body)
+
+  const tab = el('button', {
+    class: 'pg-btn pg-btn--icon pgc-tab pgc-tab--right',
+    id: 'pgc-inspector-tab',
+    type: 'button',
+    'aria-controls': 'pgc-inspector-panel',
+    on: { click: () => setOpen(!isOpen()) },
+  })
+  tab.append(icon('layers', 15), el('span', { class: 'pgc-tab__label', text: 'Inspector' }))
+
+  host.append(tab, panel)
+  mount.append(host)
+
+  /* --- open / collapsed state -------------------------------------------- */
+
+  const narrow = window.matchMedia('(max-width: 1100px)')
+  let compact = narrow.matches
+  let open = loadFlag(OPEN_KEY, false)
+  let tall = false
+  let planPreset = false
+
+  const isOpen = (): boolean => open
+
+  function applyOpen(): void {
+    const panelOpen = isOpen()
+    setClass(host, 'is-plan-hidden', planPreset)
+    setClass(host, 'is-compact', compact)
+    setClass(host, 'is-open', panelOpen)
+    tab.setAttribute('aria-expanded', String(panelOpen))
+    tab.title = panelOpen ? 'Hide the inspector' : 'Show the inspector'
+    tab.setAttribute('aria-label', tab.title)
+    panel.setAttribute('aria-hidden', String(!panelOpen))
+    panel.inert = !panelOpen
+    setModeSurface(host, panelOpen ? (compact ? MODE_SURFACES.drawer : MODE_SURFACES.panel) : null)
+    syncSheetFlags()
+  }
+
+  function setOpen(next: boolean): void {
+    open = next
+    saveFlag(OPEN_KEY, next)
+    applyOpen()
+    if (next && compact) announceSheet('right')
+  }
+
+  function setTall(next: boolean): void {
+    tall = next
+    setClass(panel, 'is-tall', tall)
+    sizeBtn.title = tall ? 'Shrink the inspector' : 'Expand the inspector'
+    sizeBtn.setAttribute('aria-label', sizeBtn.title)
+    sizeBtn.setAttribute('aria-expanded', String(tall))
+    syncSheetFlags()
+  }
+
+  /* --- live pieces, rebuilt on every selection --------------------------- */
+
+  type Tile = { set(v: string, state?: '' | 'ok' | 'warn' | 'crit'): void; get: (s: SimState) => string }
+  type ActionId = NonNullable<ComponentDoc['actions']>[number]
+  type ActionControl = { root: HTMLElement; sync(): void }
+  let tiles: Tile[] = []
+  let knobs: KnobControl[] = []
+  let actions: ActionControl[] = []
+  let liveDot: HTMLElement | null = null
+  /** undefined until the first render, so the empty state is drawn on boot */
+  let currentId: string | null | undefined
+  let currentDef: ComponentDef | undefined
+  /** seconds since the last metric refresh; primed so the first frame paints */
+  let acc = TICK
+  /** which prose sections the user left open, per component, for this session */
+  const sectionState = new Map<string, boolean[]>()
+
+  function teardown(): void {
+    for (const k of knobs) k.dispose()
+    knobs = []
+    actions = []
+    tiles = []
+    liveDot = null
+    clear(body)
+  }
+
+  function anatomyEntry(view: AnatomyView, id: string): HTMLElement {
+    const page = view === 'page'
+    return el(
+      'aside',
+      {
+        class: 'pgc-anatomy-entry',
+        data: { anatomyEntry: view },
+        ariaLabel: page ? 'Open the 8 KiB page anatomy' : 'Open the data directory anatomy',
+      },
+      el(
+        'div',
+        { class: 'pgc-anatomy-entry__copy' },
+        el('strong', {
+          class: 'pgc-anatomy-entry__title',
+          text: page ? 'What is inside that 8 KiB page?' : 'What is actually inside the data directory?',
+        }),
+        el('span', {
+          class: 'pgc-anatomy-entry__hint',
+          text: page
+            ? 'Open the byte-scaled header, line pointers, free space and tuple layout.'
+            : 'Open base/, relation forks, segment suffixes, WAL and configuration files.',
+        }),
+      ),
+      el(
+        'button',
+        {
+          class: 'pg-btn pgc-anatomy-entry__button',
+          type: 'button',
+          on: { click: () => ctx.bus.emit('anatomy:open', { view, id }) },
+        },
+        el('span', { text: page ? 'Open page' : 'Open directory' }),
+        el('span', { class: 'pgc-anatomy-entry__arrow', ariaHidden: 'true', text: '→' }),
+      ),
+    )
+  }
+
+  function componentAction(action: ActionId): ActionControl {
+    if (action === 'start-restore-drill') return restoreDrillAction()
+
+    const button = el('button', { class: 'pg-btn', type: 'button' })
+    const hint = el('p', { class: 'pg-hint' })
+    const root = el('div', { class: 'pg-field' }, button, hint)
+
+    button.addEventListener('click', () => {
+      if (action === 'start-full-backup') ctx.sim.startBaseBackup()
+      else if (action === 'start-pitr') ctx.sim.startPointInTimeRestore()
+      else if (action === 'start-switchover') ctx.sim.startSwitchover()
+      else if (action === 'trigger-failover') ctx.sim.startFailover()
+      else ctx.sim.startPgRewind()
+      sync()
+    })
+
+    function sync(): void {
+      const s = ctx.sim.state
+      if (action === 'start-full-backup') {
+        const op = s.disasterRecovery.backup
+        const active = op.status === 'copying' || op.status === 'waiting_wal'
+        button.disabled = active || !s.replication.standbys[0].connected || s.knobs.walLevel === 'minimal'
+        setText(
+          button,
+          op.status === 'copying'
+            ? `Full backup ${(op.progress * 100).toFixed(0)}%`
+            : op.status === 'waiting_wal'
+              ? 'Waiting for archived WAL'
+              : op.status === 'failed'
+                ? 'Retry WAL-G full backup'
+                : 'Take WAL-G full backup',
+        )
+        setText(
+          hint,
+          op.status === 'failed'
+            ? op.failureReason
+            : `Daily backup-push reads ${fmtBytes(s.disasterRecovery.dataDirectoryBytes)} from standby_a and sends compressed objects straight to S3. One teaching day is ${fmtDuration(s.disasterRecovery.backupSchedule.intervalSec)}; next scheduled start in ${fmtDuration(Math.max(0, s.disasterRecovery.backupSchedule.nextStartAt - s.t))}.`,
+        )
+        return
+      }
+
+      if (action === 'start-pitr') {
+        const restore = s.disasterRecovery.restore
+        const active = restore.status === 'fetching' || restore.status === 'replaying'
+        const drillActive =
+          s.disasterRecovery.drill.status === 'restoring'
+          || s.disasterRecovery.drill.status === 'verifying'
+          || s.disasterRecovery.drill.status === 'querying'
+        button.disabled = active || drillActive || s.disasterRecovery.backups.length === 0
+        setText(
+          button,
+          active
+            ? `PITR ${(restore.progress * 100).toFixed(0)}%`
+            : restore.status === 'failed'
+              ? 'Retry point-in-time restore'
+              : 'Restore to selected time',
+        )
+        setText(
+          hint,
+          drillActive
+            ? 'The recovery host remains occupied until the restore drill finishes validation.'
+            : restore.status === 'failed'
+            ? restore.failureReason
+            : `Target: ${s.knobs.recoveryTargetAge}s before now. This fetches a retained full backup, then replays archived WAL; it never promotes.`,
+        )
+        return
+      }
+
+      const ha = s.highAvailability
+      const transition = ha.transition
+      if (action === 'start-switchover') {
+        const active = transition.status === 'waiting'
+        button.disabled =
+          active
+          || ha.currentLeader !== 'primary'
+          || !ha.patroni.dcs.canCommit
+          || !ha.patroni.agents[0].canReachConsensus
+          || !ha.patroni.agents[1].canReachConsensus
+          || !s.replication.standbys[0].connected
+        setText(
+          button,
+          active && transition.kind === 'switchover'
+            ? `Waiting ${(transition.waitSec).toFixed(1)} s`
+            : transition.kind === 'switchover' && transition.status === 'complete'
+              ? 'Switchover complete'
+              : 'Planned switchover → standby_a',
+        )
+        setText(
+          hint,
+          transition.kind === 'switchover' && transition.status === 'complete'
+            ? `${transition.waitSec.toFixed(1)} s wait · zero bytes · zero transactions lost`
+            : 'Stops write admission, waits for standby_a to flush every byte, then compare-and-swaps the Patroni leader key.',
+        )
+        return
+      }
+
+      if (action === 'trigger-failover') {
+        const active = transition.status === 'waiting'
+        button.disabled =
+          active
+          || ha.currentLeader !== 'primary'
+          || !ha.patroni.dcs.canCommit
+          || !ha.patroni.agents[1].canReachConsensus
+          || !s.replication.standbys[0].connected
+        setText(
+          button,
+          active && transition.kind === 'failover'
+            ? `Lease TTL expires in ${ha.patroni.dcs.leaderKey.leaseRemainingSec.toFixed(1)} s`
+            : transition.kind === 'failover' && transition.status === 'complete'
+              ? 'Failover complete'
+              : 'Unplanned failover → standby_a',
+        )
+        setText(
+          hint,
+          transition.kind === 'failover' && transition.status === 'complete'
+            ? `${fmtBytes(transition.lossBytes)} and ${transition.lossTransactions.toLocaleString()} committed write transactions lost`
+            : 'Removes the primary immediately. Patroni waits out its lease, promotes standby_a at its durable LSN, and reports the missing history.',
+        )
+        return
+      }
+
+      const rewind = ha.rejoin
+      const active = rewind.status === 'checking' || rewind.status === 'rewinding'
+      button.disabled = active || !rewind.required
+      setText(
+        button,
+        active
+          ? `pg_rewind ${(rewind.progress * 100).toFixed(0)}%`
+          : rewind.status === 'failed'
+            ? 'Retry pg_rewind'
+            : rewind.status === 'complete'
+              ? 'pg_rewind complete'
+              : 'Run pg_rewind',
+      )
+      setText(
+        hint,
+        rewind.failureReason
+          || (
+            rewind.required
+              ? `${fmtBytes(rewind.bytesRewound)} diverged · estimated ${rewind.estimatedDurationSec.toFixed(1)} s after start`
+              : 'No divergent former primary currently needs rewind.'
+          ),
+      )
+    }
+
+    sync()
+    return { root, sync }
+  }
+
+  function restoreDrillAction(): ActionControl {
+    const level = el(
+      'select',
+      {
+        class: 'pg-select pgc-drill__level',
+        ariaLabel: 'Restore drill proof level',
+      },
+      el('option', {
+        value: 'table',
+        text: `${CLAIM_VALUES.restoreDrill.levels.table.label} · ${CLAIM_VALUES.restoreDrill.levels.table.cadence}`,
+      }),
+      el('option', {
+        value: 'cluster',
+        text: `${CLAIM_VALUES.restoreDrill.levels.cluster.label} · ${CLAIM_VALUES.restoreDrill.levels.cluster.cadence}`,
+      }),
+      el('option', {
+        value: 'verified',
+        text: `${CLAIM_VALUES.restoreDrill.levels.verified.label} · ${CLAIM_VALUES.restoreDrill.levels.verified.cadence}`,
+      }),
+    )
+    level.value = 'verified'
+    const button = el('button', { class: 'pg-btn pgc-drill__run', type: 'button' })
+    const result = el('p', { class: 'pgc-drill__result', ariaLive: 'polite' })
+    const proof = el('p', {
+      class: 'pg-hint pgc-drill__proof',
+    })
+    const limits = el('p', {
+      class: 'pg-hint pgc-drill__limits',
+      data: { disclosure: 'restore-drill-limits' },
+    })
+    const cost = el('p', { class: 'pg-hint pgc-drill__cost' })
+    const cadence = el('p', {
+      class: 'pg-hint pgc-drill__cadence',
+      data: { disclosure: 'restore-drill-cadence' },
+      text: `Cadence: ${CLAIM_VALUES.restoreDrill.cadenceDisclosure}`,
+    })
+    const physical = el('p', {
+      class: 'pg-hint pgc-drill__scope',
+      data: { disclosure: 'restore-drill-physical-scope' },
+      text: CLAIM_VALUES.restoreDrill.physicalScopeDisclosure,
+    })
+    const smoke = el('p', {
+      class: 'pg-hint pgc-drill__smoke',
+      data: { disclosure: 'restore-drill-smoke' },
+      text: CLAIM_VALUES.restoreDrill.smokeDisclosure,
+    })
+    const timing = el('p', {
+      class: 'pg-hint pgc-drill__time',
+      data: { disclosure: 'restore-drill-time' },
+      text: CLAIM_VALUES.restoreDrill.timeDisclosure,
+    })
+    const root = el(
+      'div',
+      { class: 'pg-field pgc-drill', data: { restoreDrill: 'control' } },
+      el('label', { class: 'pg-field__label', text: 'Proof level' }),
+      level,
+      button,
+      result,
+      proof,
+      limits,
+      cost,
+      cadence,
+      physical,
+      smoke,
+      timing,
+    )
+
+    button.addEventListener('click', () => {
+      ctx.sim.startRestoreDrill(level.value as RestoreDrillLevel)
+      sync()
+    })
+    level.addEventListener('change', sync)
+
+    function sync(): void {
+      const drill = ctx.sim.state.disasterRecovery.drill
+      const selected = level.value as RestoreDrillLevel
+      const selectedMeta = CLAIM_VALUES.restoreDrill.levels[selected]
+      const active =
+        drill.status === 'restoring'
+        || drill.status === 'verifying'
+        || drill.status === 'querying'
+      const restoreActive =
+        ctx.sim.state.disasterRecovery.restore.status === 'fetching'
+        || ctx.sim.state.disasterRecovery.restore.status === 'replaying'
+      const hasResult = drill.status !== 'idle'
+      const resultMeta = hasResult
+        ? CLAIM_VALUES.restoreDrill.levels[drill.level]
+        : selectedMeta
+      root.dataset.status = drill.status
+      level.disabled = active
+      button.disabled = active || restoreActive
+      setText(
+        button,
+        active
+          ? `${CLAIM_VALUES.restoreDrill.levels[drill.level].label} ${(drill.progress * 100).toFixed(0)}%`
+          : drill.status === 'failed' && drill.level === selected
+            ? `Retry ${selectedMeta.label}`
+            : `Run ${selectedMeta.label}`,
+      )
+
+      if (drill.status === 'failed') {
+        setText(result, `${resultMeta.label} · FAIL — ${drill.failureReason}`)
+        setText(proof, `Proved by this result: the ${resultMeta.label} recovery claim is not currently met.`)
+      } else if (drill.status === 'passed') {
+        const timelineResult = ctx.sim.state.disasterRecovery.restore.resultMessage
+        setText(
+          result,
+          `${resultMeta.label} · PASS — Restore-to-target time ${fmtDuration(drill.measuredRestoreToTargetSec)} measured · total drill ${fmtDuration(drill.elapsedSec)}${timelineResult ? ` · ${timelineResult}` : ''}`,
+        )
+        setText(proof, `Proved: ${resultMeta.supports}`)
+      } else if (active) {
+        setText(
+          result,
+          `RUNNING — ${drill.status} · Restore-to-target time ${fmtDuration(drill.estimatedRestoreToTargetSec)} estimate · backup ${fmtDuration(drill.backupAgeSec)} old · ${fmtBytes(drill.walBytesRequired)} WAL`,
+        )
+        setText(proof, `Proved only if this finishes PASS: ${CLAIM_VALUES.restoreDrill.levels[drill.level].supports}`)
+      } else {
+        setText(result, 'Restore-to-target time: not measured — run the drill against the current retained objects.')
+        setText(proof, `Proved only by a PASS: ${selectedMeta.supports}`)
+      }
+      setText(limits, `Did not prove: ${resultMeta.limits}`)
+      setText(
+        cost,
+        `Object-store reads: ${fmtBytes(drill.objectStoreBytesRead)} · recovery-host validation reads: ${fmtBytes(drill.validationBytesRead)}`,
+      )
+    }
+
+    sync()
+    return { root, sync }
+  }
+
+  /* --- empty state ------------------------------------------------------- */
+
+  function renderEmpty(): HTMLElement {
+    const wrap = el('div', { class: 'pgc-content pgc-empty pg-enter' })
+    wrap.append(
+      el('p', {
+        class: 'pg-hint',
+        text: 'Every structure in the city is one real mechanism inside Postgres. Open one and it explains itself, with its own live counters and the parameters that govern it.',
+      }),
+    )
+
+    const list = el('div', { class: 'pgc-empty__list' })
+    for (const id of SUGGESTIONS) {
+      const d = ctx.registry.get(id)
+      const info = doc(id)
+      const name = d?.name ?? info?.title ?? id
+      const why = d?.role ?? info?.subtitle ?? ''
+      list.append(
+        el(
+          'button',
+          {
+            class: 'pg-btn pgc-empty__btn',
+            type: 'button',
+            on: {
+              click: () => {
+                ctx.bus.emit('focus', { id })
+                ctx.bus.emit('select', { id })
+              },
+            },
+          },
+          el('span', { class: 'pgc-empty__n', text: name }),
+          why ? el('span', { class: 'pgc-empty__w', text: why }) : null,
+        ),
+      )
+    }
+    wrap.append(el('p', { class: 'pg-eyebrow pgc-empty__k', text: 'Start here' }), list)
+
+    const keys = el('p', { class: 'pgc-empty__keys' })
+    keys.append(
+      el('span', { class: 'pg-kbd', text: '1' }),
+      document.createTextNode('–'),
+      el('span', { class: 'pg-kbd', text: '8' }),
+      document.createTextNode(' jump between districts · '),
+      el('span', { class: 'pg-kbd', text: 'T' }),
+      document.createTextNode(' takes the guided tour'),
+    )
+    wrap.append(keys)
+
+    /* Whose shoulders this stands on. Named here rather than in every panel,
+       and worded so nobody reads it as an endorsement — none of these people
+       has seen this city. Each component also links the exact page or chapter
+       it draws on, under "Go deeper". */
+    wrap.append(
+      el('p', { class: 'pg-eyebrow pgc-empty__k', text: 'Where this comes from' }),
+      el('p', {
+        class: 'pg-hint',
+        text: 'The explanations lean on the PostgreSQL documentation, Bruce Momjian’s talks and slides, Hironobu Suzuki’s “The Internals of PostgreSQL”, and Egor Rogov’s “PostgreSQL 14 Internals”. With thanks — and to be clear, none of them is involved in this project or has reviewed it. Every mistake you find here is this project’s own.',
+      }),
+    )
+    return wrap
+  }
+
+  /* --- populated state --------------------------------------------------- */
+
+  function actionBlock(actionIds: ActionId[]): HTMLElement {
+    const block = el(
+      'div',
+      { class: 'pgc-block pgc-block--actions' },
+      el('div', { class: 'pgc-eyebrow-row' }, el('span', { class: 'pg-eyebrow', text: 'Operate it' })),
+    )
+    for (const action of actionIds) {
+      const control = componentAction(action)
+      actions.push(control)
+      block.append(control.root)
+    }
+    return block
+  }
+
+  function renderDoc(id: string, info: ComponentDoc | undefined): HTMLElement {
+    const wrap = el('div', {
+      class: 'pgc-content pg-enter',
+      data: { correctionSubject: 'city-inspector' },
+    })
+    if (id === 'backend.localmem') {
+      wrap.append(
+        el('p', {
+          class: 'pgc-block pg-hint',
+          data: { disclosure: 'work-mem-model-scope' },
+          text: CLAIM_VALUES.workMem.coverageDisclosure,
+        }),
+      )
+    }
+    if (id === 'client.pool' || id === 'client.pooler') {
+      wrap.append(
+        el('p', {
+          class: 'pgc-block pg-hint',
+          data: { disclosure: 'connection-pooler-model-scope' },
+          text: CLAIM_VALUES.connectionPooler.coverageDisclosure,
+        }),
+      )
+    }
+    if (id === 'timeline.yard' || id === 'recovery.ground' || id === 'recovery.clock') {
+      wrap.dataset.disclosure = 'one-fork-timeline-recovery-scope'
+      wrap.append(
+        el('p', {
+          class: 'pgc-block pg-hint',
+          data: { disclosure: 'one-fork-timeline-recovery-visible-scope' },
+          text: CLAIM_VALUES.timelineRecovery.coverageDisclosure,
+        }),
+      )
+    }
+
+    /* metrics first — the numbers are the reason this feels alive */
+    const metrics = info?.metrics ?? []
+    if (metrics.length) {
+      const dot = el('span', { class: 'pgc-live-dot' })
+      liveDot = dot
+      const grid = el('div', { class: 'pg-metrics pgc-metrics' })
+      for (const m of metrics) {
+        const tile = metricTile(m.label)
+        if (m.hint) tile.root.title = m.hint
+        grid.append(tile.root)
+        tiles.push({ set: tile.set, get: m.get })
+      }
+      wrap.append(
+        el('div', { class: 'pgc-block pgc-block--metrics' }, el('div', { class: 'pgc-eyebrow-row' }, el('span', { class: 'pg-eyebrow', text: 'Live' }), dot), grid),
+      )
+    }
+
+    const earlyActions = (info?.actions ?? []).filter((action) => action === 'start-restore-drill')
+    if (earlyActions.length) wrap.append(actionBlock(earlyActions))
+
+    /* prose */
+    if (info?.sections?.length) {
+      const remembered = sectionState.get(id)
+      const flags: boolean[] = []
+      const prose = el('div', { class: 'pgc-block pgc-block--prose' })
+      info.sections.forEach((section, i) => {
+        const open = remembered?.[i] ?? i === 0
+        flags.push(open)
+        const collapse = createCollapse(section.heading, {
+          open,
+          // `flags` is the array held by sectionState, so this remembers itself
+          onToggle: (next) => {
+            flags[i] = next
+          },
+        })
+        collapse.root.classList.add('pgc-section')
+        collapse.body.append(proseBody(section.body))
+        if (id === 'storage.datadir' && section.heading === 'The layout') {
+          collapse.body.append(anatomyEntry('directory', id))
+        }
+        if (discussesPageLayout(id, section.heading, section.body, i)) {
+          collapse.body.append(anatomyEntry('page', id))
+        }
+        prose.append(collapse.root)
+      })
+      sectionState.set(id, flags)
+      wrap.append(prose)
+    } else {
+      wrap.append(
+        el(
+          'div',
+          { class: 'pgc-block pgc-block--prose' },
+          el('p', { class: 'pg-eyebrow', text: 'No notes' }),
+          el('p', {
+            class: 'pg-hint',
+            text: 'No notes for this one yet. It is a real part of the city — it just has not been written up.',
+          }),
+        ),
+      )
+    }
+
+    /* inline knobs */
+    const keys = (info?.knobs ?? []).filter((k, i, a) => a.indexOf(k) === i) as (keyof Knobs)[]
+    if (keys.length) {
+      const block = el(
+        'div',
+        { class: 'pgc-block pgc-block--knobs' },
+        el('div', { class: 'pgc-eyebrow-row' }, el('span', { class: 'pg-eyebrow', text: 'Change it' })),
+      )
+      let added = 0
+      for (const key of keys) {
+        const meta = knobMeta(key)
+        if (!meta) continue
+        const control = createKnobControl(ctx, meta, true)
+        knobs.push(control)
+        block.append(control.root)
+        added += 1
+      }
+      if (added) wrap.append(block)
+    }
+
+    const trailingActions = (info?.actions ?? []).filter((action) => action !== 'start-restore-drill')
+    if (trailingActions.length) wrap.append(actionBlock(trailingActions))
+
+    /* related */
+    const see = info?.see ?? []
+    if (see.length) {
+      const row = el('div', { class: 'pgc-see' })
+      for (const other of see) {
+        const d = ctx.registry.get(other)
+        const info2 = doc(other)
+        const label = d?.name ?? info2?.title ?? other
+        row.append(
+          el('button', {
+            class: 'pg-btn pgc-see__btn',
+            type: 'button',
+            text: label,
+            title: `${other} — click to inspect, double-click to fly there`,
+            on: {
+              click: () => ctx.bus.emit('select', { id: other }),
+              dblclick: () => ctx.bus.emit('focus', { id: other }),
+            },
+          }),
+        )
+      }
+      wrap.append(
+        el('div', { class: 'pgc-block pgc-block--see' }, el('span', { class: 'pg-eyebrow', text: 'Related' }), row),
+      )
+    }
+
+    /* source — the plain-path list, for docs that have no linked reading list
+       yet. Where `refs.source` exists it says the same thing with URLs and
+       function names, so showing both would just print every path twice. */
+    const source = info?.refs?.source?.length ? [] : (info?.source ?? [])
+    if (source.length) {
+      const list = el('ul', { class: 'pgc-src' })
+      for (const path of source) list.append(el('li', { class: 'pgc-src__i pg-mono', text: path }))
+      wrap.append(
+        el(
+          'div',
+          { class: 'pgc-block pgc-block--src' },
+          el('span', { class: 'pg-eyebrow', text: 'In the source' }),
+          list,
+        ),
+      )
+    }
+
+    /* references — the reading list, only if this doc has one */
+    if (info?.refs) {
+      const block = renderRefs(info.refs)
+      if (block) wrap.append(block)
+    }
+
+    createCorrectionPath(wrap, {
+      surface: 'City / Inspector',
+      panel: () => `${title.textContent || info?.title || id} (${id})`,
+      source: docSource(id),
+      claim: () => displayedClaim(
+        title,
+        subtitle,
+        ...wrap.querySelectorAll<HTMLElement>('.pgc-block--prose'),
+      ),
+      context: () => inspectorCorrectionContext(id, info, ctx.sim.state),
+    })
+
+    return wrap
+  }
+
+  /* --- selection --------------------------------------------------------- */
+
+  function select(id: string | null): void {
+    if (id === currentId) {
+      if (id && !open) setOpen(true)
+      return
+    }
+    const clearedSelection = id == null && currentId != null
+    currentId = id
+    teardown()
+
+    const def = id ? ctx.registry.get(id) : undefined
+    const info = id ? doc(id) : undefined
+    currentDef = def
+
+    if (!id) {
+      body.dataset.analyticsPanel = 'inspector'
+      kindBadge.hidden = true
+      setText(title, 'Nothing selected')
+      setText(subtitle, 'Click a building to open it up')
+      subtitle.hidden = false
+      setText(readout, '')
+      readout.hidden = true
+      flyBtn.disabled = true
+      closeBtn.disabled = false
+      body.append(renderEmpty())
+      body.scrollTop = 0
+      if (clearedSelection) setOpen(false)
+      return
+    }
+
+    body.dataset.analyticsPanel = id
+    const kind = def?.kind ?? inferKind(id)
+    kindBadge.hidden = false
+    kindBadge.dataset.kind = kind
+    setText(kindBadge, kind)
+    if (def?.color != null) kindBadge.style.setProperty('--kind', hex6(def.color))
+    else kindBadge.style.removeProperty('--kind')
+
+    setText(title, def?.name ?? destinationForId(id)?.name ?? info?.title ?? id)
+    const sub = def?.role ?? info?.subtitle ?? ''
+    setText(subtitle, sub)
+    subtitle.hidden = !sub
+    readout.hidden = !def?.readout
+    flyBtn.disabled = !def
+    flyBtn.title = def ? 'Fly the camera to this component' : 'This one has no place in the city to fly to'
+    closeBtn.disabled = false
+
+    body.append(renderDoc(id, info))
+    body.scrollTop = 0
+    acc = TICK // paint the new metrics on the very next frame, not 160ms later
+    setOpen(true)
+    ctx.bus.emit('panel:open', { panel: 'inspector', item: id })
+  }
+
+  /* --- wiring ------------------------------------------------------------ */
+
+  const offSelect = ctx.bus.on('select', ({ id, outlineOnly }) => {
+    if (!outlineOnly) select(id)
+  })
+  const offCameraPreset = ctx.bus.on('camera:preset', ({ preset }) => {
+    planPreset = preset === 'plan'
+    applyOpen()
+  })
+
+  const onNarrow = (): void => {
+    compact = narrow.matches
+    applyOpen()
+  }
+  narrow.addEventListener('change', onNarrow)
+
+  /* Two sheets, one place to stand. */
+  const onSheet = (e: Event): void => {
+    if (sheetSideOf(e) !== 'right' && compact && open) setOpen(false)
+  }
+  window.addEventListener(SHEET_EVENT, onSheet)
+
+  applyOpen()
+  if (compact && open) announceSheet('right')
+  select(null)
+
+  return {
+    update(dt: number) {
+      acc += dt
+      if (acc < TICK) return
+      acc = 0
+      const s = ctx.sim.state
+      for (const t of tiles) {
+        let text = '—'
+        try {
+          text = t.get(s)
+        } catch {
+          text = '—'
+        }
+        t.set(text)
+      }
+      if (liveDot) setClass(liveDot, 'is-paused', s.knobs.paused)
+      if (currentDef?.readout && !readout.hidden) {
+        try {
+          setText(readout, currentDef.readout(s))
+        } catch {
+          setText(readout, '')
+        }
+      }
+      for (const k of knobs) k.sync()
+      for (const action of actions) action.sync()
+    },
+    dispose() {
+      offSelect()
+      offCameraPreset()
+      narrow.removeEventListener('change', onNarrow)
+      window.removeEventListener(SHEET_EVENT, onSheet)
+      setModeSurface(host, null)
+      teardown()
+      host.remove()
+      syncSheetFlags()
+    },
+  }
+}

@@ -1,0 +1,810 @@
+import { describe, expect, it } from 'vitest'
+
+import {
+  checkDiagnosticSql,
+  checkGucContexts,
+  checkVersion,
+  compareSetting,
+  connectionLocalChecks,
+  diagnosticSqlForMajor,
+  expectedForMajor,
+  hotUpdateChecks,
+  horizonConstraintChecks,
+  indexWalkAttributeChecks,
+  linePointerLifecycleChecks,
+  loadOracleRegistry,
+  logicalSlotHorizonCheck,
+  markdownTable,
+  oracleSummary,
+  operationalActionChecks,
+  parsePgControlWalSegmentSize,
+  partialIndexBehaviorChecks,
+  toastReadPathChecks,
+  standbyFeedbackHorizonCheck,
+  verdictForComparison,
+  visibilityMapChecks,
+  waitEventClaimsForMajor,
+  walFileNameOffsetForLsn,
+  walSegmentObservationChecks,
+  workMemMultiplicationChecks,
+} from './pg-oracle.mjs'
+
+describe('PostgreSQL oracle claim registry', () => {
+  it('separates four registered model divergences from actionable results', async () => {
+    const registry = await loadOracleRegistry()
+    const registered = registry.claims.gucDefaults
+      .filter((claim) => claim.registeredDivergence)
+      .map((claim) => claim.id)
+
+    expect(registered).toEqual([
+      'city-model/checkpoint_timeout',
+      'city-model/max_wal_size',
+      'city-model/shared_buffers',
+      'city-model/autovacuum_vacuum_scale_factor',
+    ])
+    expect(verdictForComparison(true)).toBe('MATCH')
+    expect(verdictForComparison(false)).toBe('DIVERGES')
+    expect(verdictForComparison(false, true)).toBe('REGISTERED DIVERGENCE')
+    expect(verdictForComparison(true, true)).toBe('UNEXPECTED MATCH')
+
+    expect(oracleSummary([
+      { verdict: 'MATCH' },
+      { verdict: 'REGISTERED DIVERGENCE' },
+      { verdict: 'DIVERGES' },
+      { verdict: 'UNEXPECTED MATCH' },
+    ])).toEqual({
+      matches: 1,
+      registered: 1,
+      unexpected: 2,
+      unexpectedRows: [
+        { verdict: 'DIVERGES' },
+        { verdict: 'UNEXPECTED MATCH' },
+      ],
+    })
+
+    const versionRegistry = {
+      target: {
+        major: 18,
+        referenceMinor: 4,
+        referenceLabel: 'PostgreSQL 18.4',
+      },
+    }
+    const queryFor = (serverVersion, serverVersionNum) => async () => [{
+      server_version: serverVersion,
+      server_version_num: serverVersionNum,
+    }]
+    await expect(checkVersion(queryFor('18.3', '180003'), versionRegistry, 18))
+      .resolves.toContainEqual(expect.objectContaining({ verdict: 'MATCH' }))
+    await expect(checkVersion(queryFor('18.4', '180004'), versionRegistry, 18))
+      .resolves.toContainEqual(expect.objectContaining({ verdict: 'MATCH' }))
+    await expect(checkVersion(queryFor('18.5', '180005'), versionRegistry, 18))
+      .resolves.toContainEqual(expect.objectContaining({ verdict: 'DIVERGES' }))
+  })
+
+  it('discovers every check family through the registered oracle sources', async () => {
+    const registry = await loadOracleRegistry()
+
+    expect(registry.registeredCityClaims).toEqual([
+      'walSegment',
+      'modelLatency',
+      'connectionPooler',
+      'workMem',
+      'restoreDrill',
+      'timelineRecovery',
+      'vacuumReclaim',
+      'mvccVocabulary',
+      'machineSynchronousCommitComparison',
+      'machineIndexWalk',
+    ])
+    expect(registry.unregisteredCityClaims).toEqual([])
+    expect(registry.claims).toMatchObject({
+      walSegment: { defaultBytes: 16 * 1024 * 1024, alternateMiB: 32 },
+      latencyWaitMappings: {
+        relation: { type: 'Lock', name: 'relation' },
+        synchronousReplication: { type: 'IPC', name: 'SyncRep' },
+      },
+      connectionLocal: { advisoryLockKey: 818_204 },
+      workMemExecution: {
+        spillWorkMemKiB: 64,
+        hashWorkMemMiB: 1,
+      },
+      nativeRecovery: { logicalDependencyType: 'oracle_mood' },
+      timelineRecovery: { historyFile: '00000002.history' },
+      vacuumReclaim: { rows: 24_000 },
+      asynchronousCommit: { lossWindowMultiplier: 3 },
+      partialIndexBehavior: { rows: 2_000 },
+    })
+    expect(registry.actions.tuneAutovacuum.versionSpecificity.setting)
+      .toBe('autovacuum_max_workers')
+
+    expect(registry.claims.gucDefaults.length).toBeGreaterThan(8)
+    expect(registry.catalog.some((entry) => entry.id === 'pg_stat_io')).toBe(true)
+    expect(waitEventClaimsForMajor(registry.claims.waitEvents, 13)).toContainEqual(
+      expect.objectContaining({ id: 'wal-sync', type: 'IO', name: 'WALSync' }),
+    )
+    expect(waitEventClaimsForMajor(registry.claims.waitEvents, 17)).toContainEqual(
+      expect.objectContaining({ id: 'wal-sync', type: 'IO', name: 'WalSync' }),
+    )
+    expect(waitEventClaimsForMajor(registry.claims.waitEvents, 18)).toContainEqual(
+      expect.objectContaining({ id: 'wal-write', type: 'LWLock', name: 'WALWrite' }),
+    )
+    expect(registry.claims.pgStatIo.projectionRows).toContainEqual({
+      backendType: 'checkpointer',
+      object: 'relation',
+      context: 'normal',
+      operations: ['writes', 'writebacks', 'fsyncs'],
+    })
+    expect(registry.claims.pgStatIo.projectionRows).toContainEqual({
+      backendType: 'background writer',
+      object: 'relation',
+      context: 'normal',
+      operations: ['writes', 'writebacks', 'fsyncs'],
+    })
+    expect(registry.claims.autovacuumThreshold).toMatchObject({
+      reltuples: 1_000,
+      liveTuples: 1_700,
+      deadTuples: 300,
+    })
+    expect(registry.claims.checkpointTimerSkip).toMatchObject({
+      since: 18,
+      timeoutSeconds: 30,
+    })
+    expect(registry.claims.operatorAdvice).toMatchObject({
+      statementTimeout: {
+        timeoutMs: 100,
+        idleMs: 500,
+      },
+      physicalSlotDrop: {
+        slot: 'oracle_standby_slot',
+        rows: 120_000,
+        minimumRetainedBytes: 64 * 1024 * 1024,
+      },
+    })
+    expect(registry.claims.storageMvcc).toMatchObject({
+      hotSummarizingIndex: {
+        since: 16,
+        rows: 5_000,
+      },
+      lockOnlyXmax: {
+        extension: 'pageinspect',
+      },
+      toastTupleTarget: {
+        defaultTarget: 2_000,
+        raisedTarget: 4_000,
+        valueBytes: 3_000,
+      },
+    })
+    expect(registry.claims.gucDefaults).toContainEqual(
+      expect.objectContaining({ setting: 'autovacuum_vacuum_max_threshold' }),
+    )
+    expect(registry.claims.gucContexts.map((claim) => claim.setting)).toEqual([
+      'shared_buffers',
+      'wal_buffers',
+      'max_connections',
+      'superuser_reserved_connections',
+      'reserved_connections',
+      'max_locks_per_transaction',
+      'max_prepared_transactions',
+      'max_wal_senders',
+      'max_replication_slots',
+      'checkpoint_timeout',
+      'checkpoint_completion_target',
+      'max_wal_size',
+      'bgwriter_lru_maxpages',
+      'bgwriter_delay',
+      'synchronous_commit',
+      'synchronous_standby_names',
+      'wal_level',
+      'full_page_writes',
+      'autovacuum',
+      'autovacuum_vacuum_scale_factor',
+      'autovacuum_max_workers',
+      'track_io_timing',
+      'logging_collector',
+      'shared_preload_libraries',
+    ])
+    expect(registry.indexWalk.catalogSql).toContain('pg_catalog.pg_index')
+    expect(registry.diagnosticSql.length).toBeGreaterThan(20)
+    for (const major of [17, 18]) {
+      expect(
+        registry.diagnosticSql.filter((entry) => !diagnosticSqlForMajor(entry, major)),
+        `every Diagnose SQL block needs a PostgreSQL ${major} form`,
+      ).toEqual([])
+    }
+  })
+
+  it('checks operational action facts at the selected server boundary', () => {
+    const actions = {
+      tuneAutovacuum: {
+        versionSpecificity: {
+          setting: 'autovacuum_max_workers',
+          variants: [
+            { from: 13, to: 17, context: 'postmaster', activation: 'server restart' },
+            { from: 18, context: 'sighup', activation: 'configuration reload' },
+          ],
+        },
+      },
+      restoreConnectionCapacity: {
+        preconditions: [
+          'Count max_connections minus superuser_reserved_connections and, where available, reserved_connections.',
+        ],
+      },
+      enableRelationAutovacuum: {
+        preconditions: ['Inspect pg_class.reloptions for autovacuum_enabled=false.'],
+      },
+    }
+    const observations = {
+      workerContext: 'postmaster',
+      maxConnections: 8,
+      superuserReservedConnections: 3,
+      reservedConnections: 0,
+      relationAutovacuumEnabled: false,
+    }
+
+    expect(operationalActionChecks(actions, observations, 17)).toEqual([
+      expect.objectContaining({
+        claim: 'action/autovacuum_max_workers/activation',
+        city: expect.stringMatching(/server restart/),
+        server: 'postmaster',
+        verdict: 'MATCH',
+      }),
+      expect.objectContaining({
+        claim: 'action/ordinary-connection-capacity',
+        city: expect.stringMatching(/8 - 3 - 0 = 5/),
+        verdict: 'MATCH',
+      }),
+      expect.objectContaining({
+        claim: 'action/per-relation-autovacuum',
+        server: 'autovacuum_enabled=false',
+        verdict: 'MATCH',
+      }),
+    ])
+  })
+
+  it('executes the registered Diagnose SQL form for the selected major', async () => {
+    const calls = []
+    const psql = async (sql) => {
+      calls.push(sql)
+      return { code: 0, stdout: '', stderr: '' }
+    }
+    const registry = {
+      diagnosticSql: [
+        {
+          id: 'step/versioned',
+          variants: [
+            { from: 17, to: 17, sql: 'SELECT reads * op_bytes AS read_bytes FROM pg_stat_io;' },
+            { from: 18, sql: 'SELECT read_bytes FROM pg_stat_io;' },
+          ],
+        },
+      ],
+    }
+
+    await expect(checkDiagnosticSql(psql, registry, 17)).resolves.toEqual([
+      {
+        claim: 'diagnostic-sql/step/versioned',
+        city: 'executes on PostgreSQL 17',
+        server: 'executed successfully',
+        verdict: 'MATCH',
+      },
+    ])
+    expect(calls).toEqual(['SELECT reads * op_bytes AS read_bytes FROM pg_stat_io;'])
+
+    calls.length = 0
+    await checkDiagnosticSql(psql, registry, 18)
+    expect(calls).toEqual(['SELECT read_bytes FROM pg_stat_io;'])
+  })
+
+  it('reports a Diagnose SQL execution error as an oracle divergence', async () => {
+    const psql = async () => ({
+      code: 1,
+      stdout: '',
+      stderr: 'ERROR: column "num_done" does not exist',
+    })
+    const registry = {
+      diagnosticSql: [{ id: 'confirm/checkpoint', variants: [{ from: 17, sql: 'SELECT num_done;' }] }],
+    }
+
+    await expect(checkDiagnosticSql(psql, registry, 17)).resolves.toEqual([
+      {
+        claim: 'diagnostic-sql/confirm/checkpoint',
+        city: 'executes on PostgreSQL 17',
+        server: 'ERROR: column "num_done" does not exist',
+        verdict: 'DIVERGES',
+      },
+    ])
+  })
+
+  it('qualifies the autovacuum worker context at its PostgreSQL 18 boundary', async () => {
+    const registry = await loadOracleRegistry()
+    const claim = registry.claims.gucContexts.find(
+      (candidate) => candidate.setting === 'autovacuum_max_workers',
+    )
+
+    expect(claim.cityClaim).toMatch(/PostgreSQL 17.*postmaster.*PostgreSQL 18.*sighup/is)
+    expect(expectedForMajor(claim, 13)).toMatchObject({ context: 'postmaster' })
+    expect(expectedForMajor(claim, 17)).toMatchObject({ context: 'postmaster' })
+    expect(expectedForMajor(claim, 18)).toMatchObject({ context: 'sighup' })
+  })
+
+  it('compares registered contexts with pg_settings in one query', async () => {
+    const query = async () => [
+      { name: 'stable_setting', context: 'sighup' },
+      { name: 'changed_setting', context: 'postmaster' },
+    ]
+    const registry = {
+      claims: {
+        gucContexts: [
+          {
+            setting: 'stable_setting',
+            cityClaim: 'reloadable',
+            expected: { context: 'sighup' },
+          },
+          {
+            setting: 'changed_setting',
+            cityClaim: 'version-qualified',
+            expected: [
+              { from: 13, to: 17, context: 'postmaster' },
+              { from: 18, context: 'sighup' },
+            ],
+          },
+        ],
+      },
+    }
+
+    await expect(checkGucContexts(query, registry, 17)).resolves.toEqual([
+      {
+        claim: 'GUC-context/stable_setting',
+        city: 'reloadable: sighup',
+        server: 'sighup',
+        verdict: 'MATCH',
+      },
+      {
+        claim: 'GUC-context/changed_setting',
+        city: 'version-qualified: postmaster',
+        server: 'postmaster',
+        verdict: 'MATCH',
+      },
+    ])
+  })
+
+  it('selects versioned expectations without special-casing a major in the tool', () => {
+    const claim = {
+      expected: [
+        { from: 13, to: 14, value: 1, unit: '' },
+        { from: 15, value: 2, unit: '' },
+      ],
+    }
+
+    expect(expectedForMajor(claim, 13)).toMatchObject({ value: 1 })
+    expect(expectedForMajor(claim, 17)).toMatchObject({ value: 2 })
+    expect(expectedForMajor(claim, 19)).toMatchObject({ value: 2 })
+  })
+
+  it('compares SHOW, pg_control, WAL files, and a differently-initdb-d cluster', () => {
+    expect(parsePgControlWalSegmentSize(`
+      pg_control version number:            1800
+      Bytes per WAL segment:                16777216
+    `)).toBe(16 * 1024 * 1024)
+    expect(parsePgControlWalSegmentSize('pg_control output without the field')).toBeNull()
+
+    const city = { bytes: 16 * 1024 * 1024, label: '16 MiB' }
+    const claim = {
+      defaultBytes: city.bytes,
+      alternateMiB: 32,
+      configurableClaim: 'selected at initdb with --wal-segsize',
+      unqualifiedFixedSurfaces: ['world role', 'storage tldr'],
+    }
+    const observation = (bytes) => ({
+      show: bytes === city.bytes ? '16MB' : '32MB',
+      showBytes: bytes,
+      controlBytes: bytes,
+      lsn: '0/1802000',
+      timelineId: 1,
+      fileName: bytes === city.bytes
+        ? '000000010000000000000001'
+        : '000000010000000000000000',
+      fileOffset: bytes === city.bytes ? 0x802000 : 0x1802000,
+      allocatedFile: bytes === city.bytes
+        ? '000000010000000000000001'
+        : '000000010000000000000000',
+      fileSize: bytes,
+    })
+    const rows = walSegmentObservationChecks(
+      city,
+      claim,
+      observation(city.bytes),
+      observation(32 * 1024 * 1024),
+    )
+    const byClaim = new Map(rows.map((row) => [row.claim, row]))
+
+    expect(rows).toHaveLength(9)
+    expect(byClaim.get('WAL/default/SHOW-wal_segment_size')?.verdict).toBe('MATCH')
+    expect(byClaim.get('WAL/default/pg_control')?.verdict).toBe('MATCH')
+    expect(byClaim.get('WAL/initdb-alternate/SHOW-wal_segment_size')?.verdict).toBe('MATCH')
+    expect(byClaim.get('WAL/initdb-alternate/pg_control')?.verdict).toBe('MATCH')
+    expect(byClaim.get('WAL/initdb-configurability')?.verdict).toBe('MATCH')
+    expect(byClaim.get('WAL/unqualified-fixed-16MiB-surfaces')).toMatchObject({
+      verdict: 'DIVERGES',
+      city: expect.stringContaining('world role'),
+      server: expect.stringContaining('32MB'),
+    })
+    expect(walFileNameOffsetForLsn('0/1802000', 1, city.bytes)).toEqual({
+      fileName: '000000010000000000000001',
+      fileOffset: 0x802000,
+    })
+    expect(walFileNameOffsetForLsn('0/2000000', 1, city.bytes)).toEqual({
+      fileName: '000000010000000000000002',
+      fileOffset: 0,
+    })
+  })
+
+  it('rejects a plausible WAL filename that disagrees with the LSN arithmetic', () => {
+    const city = { bytes: 16 * 1024 * 1024, label: '16 MiB' }
+    const claim = {
+      defaultBytes: city.bytes,
+      alternateMiB: 32,
+      configurableClaim: 'selected at initdb with --wal-segsize',
+      unqualifiedFixedSurfaces: [],
+    }
+    const observation = (bytes, fileName, fileOffset) => ({
+      show: bytes === city.bytes ? '16MB' : '32MB',
+      showBytes: bytes,
+      controlBytes: bytes,
+      lsn: '0/1802000',
+      timelineId: 1,
+      fileName,
+      fileOffset,
+      allocatedFile: fileName,
+      fileSize: bytes,
+    })
+    const rows = walSegmentObservationChecks(
+      city,
+      claim,
+      observation(city.bytes, '000000010000000000000002', 0x802000),
+      observation(32 * 1024 * 1024, '000000010000000000000000', 0x1802000),
+    )
+
+    expect(rows.find((row) => row.claim === 'WAL/default/file-name-offset')).toMatchObject({
+      verdict: 'DIVERGES',
+    })
+  })
+
+  it('reports each connection-local behavior independently', () => {
+    const tradeoff = 'session state belongs to one server connection'
+    const claim = {
+      advisoryLockKey: 818_204,
+      preparedStatement: 'oracle_session_plan',
+      listenChannel: 'oracle_session_channel',
+    }
+    const matching = connectionLocalChecks(tradeoff, claim, {
+      a_pid: 101,
+      b_pid: 202,
+      a_work_mem: '64kB',
+      b_work_mem: '4MB',
+      b_got_lock: false,
+      a_prepared: 1,
+      b_prepared: 0,
+      prepared_result: 42,
+      a_listening: 1,
+      b_listening: 0,
+      notify_name: 'oracle_session_channel',
+      notify_extra: 'from-session-b',
+    })
+
+    expect(matching.map((row) => row.claim)).toEqual([
+      'connection-local/backend-identity',
+      'connection-local/session-GUC',
+      'connection-local/advisory-lock',
+      'connection-local/sql-PREPARE',
+      'connection-local/LISTEN-registration',
+      'connection-local/NOTIFY-delivery',
+    ])
+    expect(matching.every((row) => row.verdict === 'MATCH')).toBe(true)
+    expect(connectionLocalChecks(tradeoff, claim, null).every(
+      (row) => row.verdict === 'DIVERGES',
+    )).toBe(true)
+  })
+
+  it('requires separate HashAggregate observations and per-backend spill multiplication', () => {
+    const city = { nodeDisclosure: 'eligible nodes and concurrent backends multiply work_mem' }
+    const claim = { concurrentBackends: 2 }
+    const hashNode = (peak) => ({
+      'Node Type': 'Aggregate',
+      Strategy: 'Hashed',
+      'Peak Memory Usage': peak,
+      'HashAgg Batches': 3,
+    })
+    const incomplete = workMemMultiplicationChecks(city, claim, {
+      multiHashNodes: [hashNode(1024)],
+      activeBackends: 2,
+      tempFilesBefore: 10,
+      tempFilesAfter: 11,
+      tempBytesBefore: 1000,
+      tempBytesAfter: 2000,
+    })
+
+    expect(incomplete.map((row) => [row.claim, row.verdict])).toEqual([
+      ['work_mem/per-node-hash-allowance', 'DIVERGES'],
+      ['work_mem/concurrent-backends-multiply', 'DIVERGES'],
+    ])
+
+    const complete = workMemMultiplicationChecks(city, claim, {
+      multiHashNodes: [hashNode(1024), hashNode(1536)],
+      activeBackends: 2,
+      tempFilesBefore: 10,
+      tempFilesAfter: 12,
+      tempBytesBefore: 1000,
+      tempBytesAfter: 3000,
+    })
+    expect(complete.every((row) => row.verdict === 'MATCH')).toBe(true)
+  })
+
+  it('checks the exact seeded Machine lookup rows as well as their plan nodes', () => {
+    const city = {
+      finding: 'seeded partial-index behavior',
+      partialIndex: 'accounts_positive_owner_idx',
+      expectedLookupRow: { id: 42, balance: 1042 },
+    }
+    const observation = {
+      primaryScan: { 'Node Type': 'Index Scan', 'Index Name': 'accounts_pkey' },
+      ownerScan: { 'Node Type': 'Seq Scan' },
+      impliedScan: {
+        'Node Type': 'Index Scan',
+        'Index Name': 'accounts_positive_owner_idx',
+      },
+      primaryRows: [{ id: 42, balance: 1042 }],
+      ownerRows: [{ id: 42, balance: 7 }],
+      impliedRows: [{ id: 42, balance: 1042 }],
+    }
+
+    const wrongRow = partialIndexBehaviorChecks(city, observation)
+    expect(wrongRow.find((row) => row.claim === 'partial-index/predicate-not-implied'))
+      .toMatchObject({ verdict: 'DIVERGES' })
+
+    const exact = partialIndexBehaviorChecks(city, {
+      ...observation,
+      ownerRows: [{ id: 42, balance: 1042 }],
+    })
+    expect(exact.every((row) => row.verdict === 'MATCH')).toBe(true)
+  })
+
+  it('requires visibility-map changes to alter index-only heap fetches', () => {
+    const vocabulary = { visibilityMap: { definition: 'all-visible controls heap fetches' } }
+    const observation = {
+      visibleBefore: { all_visible: true, all_frozen: true },
+      visibleChanged: { all_visible: false, all_frozen: false },
+      visibleAfter: { all_visible: true, all_frozen: true },
+      beforeScan: { 'Node Type': 'Index Only Scan', 'Heap Fetches': 0 },
+      changedScan: { 'Node Type': 'Index Only Scan', 'Heap Fetches': 100 },
+      afterScan: { 'Node Type': 'Index Only Scan', 'Heap Fetches': 0 },
+    }
+
+    expect(visibilityMapChecks(vocabulary, observation).every(
+      (row) => row.verdict === 'MATCH',
+    )).toBe(true)
+    expect(visibilityMapChecks(vocabulary, {
+      ...observation,
+      changedScan: { 'Node Type': 'Index Only Scan', 'Heap Fetches': 0 },
+    }).find((row) => row.claim === 'visibility-map/index-only-scan-effect'))
+      .toMatchObject({ verdict: 'DIVERGES' })
+  })
+
+  it('distinguishes inline reads from the external TOAST index-and-heap path', () => {
+    const checks = toastReadPathChecks({
+      expectedLogicalBytes: 3_000,
+      expectedCompressedLogicalBytes: 3_600,
+      externalLogicalBytes: 3_000,
+      externalHeapAccesses: 2,
+      externalIndexAccesses: 1,
+      inlineLogicalBytes: [3_000, 3_600],
+      inlineHeapAccesses: 0,
+      inlineIndexAccesses: 0,
+    })
+    expect(checks.every((row) => row.verdict === 'MATCH')).toBe(true)
+    expect(toastReadPathChecks({
+      expectedLogicalBytes: 3_000,
+      expectedCompressedLogicalBytes: 3_600,
+      externalLogicalBytes: 3_000,
+      externalHeapAccesses: 2,
+      externalIndexAccesses: 1,
+      inlineLogicalBytes: [3_000, 3_600],
+      inlineHeapAccesses: 1,
+      inlineIndexAccesses: 0,
+    }).find((row) => row.claim === 'TOAST/inline-read-path'))
+      .toMatchObject({ verdict: 'DIVERGES' })
+  })
+
+  it('requires assigned and prepared XID cutoffs to retain then release dead tuples', () => {
+    const matching = horizonConstraintChecks({
+      assigned: {
+        holderXid: 100,
+        holderXmin: null,
+        deletingXid: 101,
+        retainedVersions: 1,
+        releasedVersions: 0,
+      },
+      prepared: {
+        holderXid: 200,
+        deletingXid: 201,
+        retainedVersions: 1,
+        releasedVersions: 0,
+      },
+    })
+    expect(matching.every((row) => row.verdict === 'MATCH')).toBe(true)
+    expect(horizonConstraintChecks({
+      assigned: {
+        holderXid: 100,
+        holderXmin: null,
+        deletingXid: 101,
+        retainedVersions: 0,
+        releasedVersions: 0,
+      },
+      prepared: {
+        holderXid: 200,
+        deletingXid: 201,
+        retainedVersions: 0,
+        releasedVersions: 0,
+      },
+    }).every((row) => row.verdict === 'DIVERGES')).toBe(true)
+  })
+
+  it('requires slot and standby-feedback cutoffs, not merely non-null fields', () => {
+    expect(logicalSlotHorizonCheck('slot xmins constrain cleanup', {
+      slotName: 'oracle_logical_horizon',
+      catalogXmin: 100,
+      snapshotXmin: 101,
+    })).toMatchObject({ verdict: 'MATCH' })
+    expect(logicalSlotHorizonCheck('slot xmins constrain cleanup', {
+      slotName: 'oracle_logical_horizon',
+      catalogXmin: 102,
+      snapshotXmin: 101,
+    })).toMatchObject({ verdict: 'DIVERGES' })
+
+    expect(standbyFeedbackHorizonCheck('standby feedback constrains cleanup', {
+      backendXmin: 200,
+      deletingXid: 201,
+      retainedVersions: 1,
+      releasedVersions: 0,
+    })).toMatchObject({ verdict: 'MATCH' })
+    expect(standbyFeedbackHorizonCheck('standby feedback constrains cleanup', {
+      backendXmin: 200,
+      deletingXid: 201,
+      retainedVersions: 0,
+      releasedVersions: 0,
+    })).toMatchObject({ verdict: 'DIVERGES' })
+  })
+
+  it('requires normal, redirect, dead, and reusable line-pointer states plus FSM space', () => {
+    const vocabulary = {
+      linePointers: { definition: 'normal, redirect, dead, and reusable page slots' },
+    }
+    const checks = linePointerLifecycleChecks(vocabulary, {
+      hotFlags: [2, 1],
+      deadFlags: [3],
+      reusableFlags: [0],
+      freeSpaceBefore: 0,
+      freeSpaceAfter: 7000,
+    })
+
+    expect(checks).toHaveLength(2)
+    expect(checks.every((row) => row.verdict === 'MATCH')).toBe(true)
+    expect(linePointerLifecycleChecks(vocabulary, {
+      hotFlags: [1],
+      deadFlags: [],
+      reusableFlags: [],
+      freeSpaceBefore: 0,
+      freeSpaceAfter: 0,
+    }).every((row) => row.verdict === 'DIVERGES')).toBe(true)
+  })
+
+  it('gates summarizing-index HOT behavior at PostgreSQL 16', () => {
+    const rows = [
+      { relname: 'hot_brin', n_tup_upd: 5_000, n_tup_hot_upd: 5_000, n_tup_newpage_upd: 0 },
+      { relname: 'hot_btree', n_tup_upd: 5_000, n_tup_hot_upd: 0, n_tup_newpage_upd: 0 },
+    ]
+
+    expect(hotUpdateChecks(rows, 18, 16, 5_000).every((entry) => entry.verdict === 'MATCH')).toBe(true)
+    expect(hotUpdateChecks(rows, 17, 16, 5_000).every((entry) => entry.verdict === 'MATCH')).toBe(true)
+    expect(hotUpdateChecks([
+      { ...rows[0], n_tup_hot_upd: 0 },
+      rows[1],
+    ], 13, 16, 5_000).every((entry) => entry.verdict === 'MATCH')).toBe(true)
+    expect(hotUpdateChecks([
+      { ...rows[0], n_tup_hot_upd: 0 },
+      rows[1],
+    ], 18, 16, 5_000).some((entry) => entry.verdict === 'DIVERGES')).toBe(true)
+  })
+
+  it('normalises PostgreSQL native units before comparing defaults', () => {
+    expect(compareSetting(
+      { value: 128, unit: 'MB', compare: 'bytes' },
+      { boot_val: '16384', unit: '8kB' },
+    )).toBe(true)
+    expect(compareSetting(
+      { value: 60, unit: 's', compare: 'duration' },
+      { boot_val: '5', unit: 'min' },
+    )).toBe(false)
+  })
+
+  it('renders pasteable reports and gates every index usability attribute', () => {
+    const rendered = markdownTable([
+      { claim: 'a|b', city: 'one\ntwo', server: 'three', verdict: 'DIVERGES' },
+    ])
+
+    expect(rendered).toContain('| Claim | City says | Server said | Verdict |')
+    expect(rendered).toContain('a\\|b')
+    expect(rendered).toContain('one<br>two')
+
+    const index = (
+      index_name,
+      index_definition,
+      {
+        access_method = 'btree',
+        uniqueness = 'non-unique',
+        validity = 'valid',
+        predicate = null,
+      } = {},
+    ) => ({
+      index_name,
+      access_method,
+      uniqueness,
+      validity,
+      predicate,
+      index_definition,
+    })
+    const serverRows = [
+      index('accounts_tenant_owner_idx', 'CREATE INDEX accounts_tenant_owner_idx ON oracle_fixture.accounts USING btree (tenant_id, owner)'),
+      index('accounts_owner_include_idx', 'CREATE INDEX accounts_owner_include_idx ON oracle_fixture.accounts USING btree (owner) INCLUDE (balance, email)'),
+      index('accounts_lower_owner_idx', 'CREATE INDEX accounts_lower_owner_idx ON oracle_fixture.accounts USING btree (lower(owner))'),
+      index(
+        'accounts_open_balance_idx',
+        'CREATE INDEX accounts_open_balance_idx ON oracle_fixture.accounts USING btree (balance) WHERE (deleted_at IS NULL)',
+        { predicate: '(deleted_at IS NULL)' },
+      ),
+      index('accounts_hash_idx', 'CREATE INDEX accounts_hash_idx ON oracle_fixture.accounts USING hash (owner)', { access_method: 'hash' }),
+      index('accounts_collate_idx', 'CREATE INDEX accounts_collate_idx ON oracle_fixture.accounts USING btree (owner COLLATE "C")'),
+      index('accounts_opclass_idx', 'CREATE INDEX accounts_opclass_idx ON oracle_fixture.accounts USING btree (owner text_pattern_ops)'),
+      index('accounts_desc_idx', 'CREATE INDEX accounts_desc_idx ON oracle_fixture.accounts USING btree (balance DESC NULLS LAST)'),
+      index('accounts_modifiers_idx', 'CREATE INDEX accounts_modifiers_idx ON oracle_fixture.accounts USING btree (owner COLLATE "C" text_pattern_ops DESC)'),
+      index('accounts_metadata_gin_idx', 'CREATE INDEX accounts_metadata_gin_idx ON oracle_fixture.accounts USING gin (metadata)', { access_method: 'gin' }),
+      index('accounts_created_brin_idx', 'CREATE INDEX accounts_created_brin_idx ON oracle_fixture.accounts USING brin (created_at)', { access_method: 'brin' }),
+      index('accounts_pkey', 'CREATE UNIQUE INDEX accounts_pkey ON oracle_fixture.accounts USING btree (id)', { uniqueness: 'unique' }),
+      index('accounts_invalid_owner_idx', 'CREATE UNIQUE INDEX accounts_invalid_owner_idx ON oracle_fixture.accounts USING btree (owner)', { uniqueness: 'unique', validity: 'INVALID' }),
+    ]
+    const catalogSql = 'SELECT pg_catalog.pg_get_indexdef(i.indexrelid) FROM pg_catalog.pg_index AS i'
+    const check = (rows = serverRows, sql = catalogSql) =>
+      indexWalkAttributeChecks(rows, serverRows, sql)
+    const byClaim = (rows = serverRows, sql = catalogSql) =>
+      new Map(check(rows, sql).map((entry) => [entry.claim, entry.verdict]))
+
+    expect(check().map((entry) => entry.claim)).toEqual([
+      'index-walk/composite-key-order',
+      'index-walk/include-columns',
+      'index-walk/expression-key',
+      'index-walk/partial-predicate',
+      'index-walk/non-btree-access-method',
+      'index-walk/collation',
+      'index-walk/operator-class',
+      'index-walk/key-ordering',
+      'index-walk/combined-modifiers',
+      'index-walk/uniqueness',
+      'index-walk/invalid-index',
+    ])
+    expect(check().every((entry) => entry.verdict === 'MATCH')).toBe(true)
+
+    const mutate = (name, field, value) => serverRows.map((row) =>
+      row.index_name === name ? { ...row, [field]: value } : row)
+    expect(byClaim(mutate('accounts_tenant_owner_idx', 'index_definition', '(owner, tenant_id)')).get('index-walk/composite-key-order')).toBe('DIVERGES')
+    expect(byClaim(mutate('accounts_owner_include_idx', 'index_definition', '(owner)')).get('index-walk/include-columns')).toBe('DIVERGES')
+    expect(byClaim(mutate('accounts_lower_owner_idx', 'index_definition', '(owner)')).get('index-walk/expression-key')).toBe('DIVERGES')
+    expect(byClaim(mutate('accounts_open_balance_idx', 'predicate', null)).get('index-walk/partial-predicate')).toBe('DIVERGES')
+    expect(byClaim(mutate('accounts_hash_idx', 'access_method', 'btree')).get('index-walk/non-btree-access-method')).toBe('DIVERGES')
+    expect(byClaim(serverRows, `${catalogSql}, k.position` ).get('index-walk/non-btree-access-method')).toBe('DIVERGES')
+    expect(byClaim(mutate('accounts_collate_idx', 'index_definition', '(owner)')).get('index-walk/collation')).toBe('DIVERGES')
+    expect(byClaim(mutate('accounts_opclass_idx', 'index_definition', '(owner)')).get('index-walk/operator-class')).toBe('DIVERGES')
+    expect(byClaim(mutate('accounts_desc_idx', 'index_definition', '(balance)')).get('index-walk/key-ordering')).toBe('DIVERGES')
+    expect(byClaim(mutate('accounts_modifiers_idx', 'index_definition', '(owner)')).get('index-walk/combined-modifiers')).toBe('DIVERGES')
+    expect(byClaim(mutate('accounts_pkey', 'uniqueness', 'non-unique')).get('index-walk/uniqueness')).toBe('DIVERGES')
+    expect(byClaim(serverRows.filter((row) => row.validity !== 'INVALID')).get('index-walk/invalid-index')).toBe('DIVERGES')
+  })
+})

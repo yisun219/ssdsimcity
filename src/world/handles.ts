@@ -1,0 +1,261 @@
+import * as THREE from 'three'
+
+import { COLOR } from '../core/theme'
+import type { SimState, WorldContext, WorldModule } from '../core/types'
+import { ANCHOR } from './layout'
+import { markTextPlane } from './text-plane'
+
+export type WorldHandleKey = 'autovacuum'
+
+export interface WorldHandleBinding {
+  id: string
+  key: WorldHandleKey
+  /** PostgreSQL spelling shown in the walk-up prompt. */
+  guc: string
+  owner: string
+  /** Ground-plane interaction point; proximity checks intentionally ignore Y. */
+  x: number
+  z: number
+  /** World-space knob position used by the first-person reach projection. */
+  handTarget: readonly [number, number, number]
+}
+
+export interface WorldHandlesModule extends WorldModule {
+  readonly handles: readonly WorldHandleBinding[]
+}
+
+interface HandleSpec {
+  id: string
+  key: WorldHandleKey
+  guc: string
+  owner: string
+  at: readonly [number, number, number]
+  yaw: number
+  color: number
+}
+
+interface HandleVisual {
+  key: WorldHandleKey
+  lever: THREE.Group
+  onLamp: THREE.Object3D
+  offLamp: THREE.Object3D
+  onText: THREE.Object3D
+  offText: THREE.Object3D
+}
+
+const SPECS: readonly HandleSpec[] = [
+  {
+    id: 'handle.autovacuum',
+    key: 'autovacuum',
+    guc: 'autovacuum',
+    owner: 'autovacuum launcher',
+    at: ANCHOR.handleAutovacuum,
+    yaw: Math.PI / 2,
+    color: COLOR.vacuum,
+  },
+] as const
+
+function cssColor(hex: number): string {
+  return `#${hex.toString(16).padStart(6, '0')}`
+}
+
+export function createWorldHandles(ctx: WorldContext): WorldHandlesModule {
+  const group = new THREE.Group()
+  group.name = 'world.handles'
+
+  const structure = ctx.theme.mat('world.handle.case', {
+    color: COLOR.inkDim,
+    roughness: 0.84,
+    metalness: 0.16,
+    surface: false,
+  })
+  const hardware = ctx.theme.mat('world.handle.hardware', {
+    color: COLOR.ink,
+    roughness: 0.42,
+    metalness: 0.72,
+    surface: false,
+  })
+  const plateGeo = new THREE.PlaneGeometry(1, 1)
+  const knobGeo = new THREE.SphereGeometry(0.34, 12, 8)
+  const labelMaterials: THREE.MeshBasicMaterial[] = []
+  const visuals: HandleVisual[] = []
+  const handles: WorldHandleBinding[] = []
+  const collisionBoxes: THREE.Box3[] = []
+
+  function label(
+    parent: THREE.Object3D,
+    text: string,
+    y: number,
+    width: number,
+    height: number,
+    color: number,
+    size: number,
+  ): THREE.Mesh {
+    const texture = ctx.theme.textTexture(text, {
+      size,
+      color: cssColor(color),
+      bg: '#07101c',
+      padding: size * 0.34,
+      letterSpacing: '0.04em',
+    })
+    const material = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      toneMapped: false,
+    })
+    labelMaterials.push(material)
+    const mesh = new THREE.Mesh(plateGeo, material)
+    mesh.position.set(0, y, 0.43)
+    mesh.scale.set(width, height, 1)
+    mesh.renderOrder = 3
+    mesh.raycast = () => {}
+    markTextPlane(mesh, text)
+    parent.add(mesh)
+    return mesh
+  }
+
+  for (let i = 0; i < SPECS.length; i++) {
+    const spec = SPECS[i]
+    const root = new THREE.Group()
+    root.name = spec.id
+    root.position.set(spec.at[0], spec.at[1], spec.at[2])
+    root.rotation.y = spec.yaw
+    group.add(root)
+
+    const plinth = new THREE.Mesh(ctx.theme.box(6.2, 0.5, 2.8), structure)
+    plinth.position.set(0, 0.25, 0)
+    root.add(plinth)
+
+    const cabinet = new THREE.Mesh(ctx.theme.box(5.3, 5.8, 0.7), structure)
+    cabinet.position.set(0, 3.25, 0)
+    root.add(cabinet)
+
+    const crown = new THREE.Mesh(ctx.theme.box(5.8, 0.34, 1.0), hardware)
+    crown.position.set(0, 6.25, 0)
+    root.add(crown)
+
+    const trim = new THREE.Mesh(ctx.theme.box(4.8, 0.16, 0.12), ctx.theme.neon(spec.color, 0.92))
+    trim.position.set(0, 5.72, 0.43)
+    root.add(trim)
+
+    /*
+     * The launcher is a 41 m tower: a cabinet-height caption disappears beside
+     * it from the plaza. This lit header is the city-scale discovery cue; the
+     * cabinet remains the thing the visitor actually operates.
+     */
+    const beacon = new THREE.Group()
+    beacon.name = `${spec.id}.beacon`
+    root.add(beacon)
+    const beaconPanel = new THREE.Mesh(ctx.theme.box(10.4, 3.1, 0.32), structure)
+    beaconPanel.position.set(0, 11.65, 0.05)
+    beacon.add(beaconPanel)
+    const beaconTop = new THREE.Mesh(
+      ctx.theme.box(10.9, 0.24, 0.46),
+      ctx.theme.neon(spec.color, 1.35),
+    )
+    beaconTop.position.set(0, 13.3, 0.12)
+    beacon.add(beaconTop)
+    const beaconSolids: THREE.Object3D[] = [beaconPanel, beaconTop]
+    for (let side = -1; side <= 1; side += 2) {
+      const blade = new THREE.Mesh(
+        ctx.theme.box(0.26, 7.0, 0.2),
+        ctx.theme.neon(spec.color, 1.2),
+      )
+      blade.position.set(side * 5.15, 8.45, 0.14)
+      beacon.add(blade)
+      beaconSolids.push(blade)
+    }
+    beacon.userData.collisionSolids = beaconSolids
+    label(beacon, 'AUTOVACUUM', 12.15, 9.35, 1.12, spec.color, 48)
+    label(beacon, 'CONTROL / LEVER', 10.95, 7.8, 0.72, COLOR.ink, 32)
+
+    label(root, spec.guc, 5.28, 4.65, 0.72, spec.color, 42)
+    const onText = label(root, 'ON', 4.25, 1.6, 0.64, spec.color, 46)
+    const offText = label(root, 'OFF', 4.25, 1.6, 0.64, COLOR.crit, 46)
+    label(root, 'E / TAP AT LEVER', 0.94, 4.4, 0.54, COLOR.ink, 30)
+
+    const onLamp = new THREE.Mesh(ctx.theme.box(0.76, 0.76, 0.32), ctx.theme.neon(spec.color, 1.9))
+    onLamp.name = `${spec.id}.lamp.on`
+    onLamp.position.set(-1.6, 4.24, 0.56)
+    root.add(onLamp)
+    const offLamp = new THREE.Mesh(ctx.theme.box(0.76, 0.76, 0.32), ctx.theme.neon(COLOR.crit, 1.9))
+    offLamp.name = `${spec.id}.lamp.off`
+    offLamp.position.set(1.6, 4.24, 0.56)
+    root.add(offLamp)
+
+    const pivot = new THREE.Group()
+    pivot.name = `${spec.id}.lever`
+    pivot.position.set(0, 1.75, 0.65)
+    root.add(pivot)
+    const axle = new THREE.Mesh(ctx.theme.cyl(0.5, 0.5, 0.48, 16), hardware)
+    axle.rotation.x = Math.PI / 2
+    pivot.add(axle)
+    const arm = new THREE.Mesh(ctx.theme.cyl(0.16, 0.2, 2.2, 10), hardware)
+    arm.position.y = 1.08
+    pivot.add(arm)
+    const knob = new THREE.Mesh(knobGeo, ctx.theme.neon(spec.color, 1.45))
+    knob.position.y = 2.24
+    pivot.add(knob)
+
+    handles.push({
+      id: spec.id,
+      key: spec.key,
+      guc: spec.guc,
+      owner: spec.owner,
+      x: spec.at[0],
+      z: spec.at[2],
+      handTarget: [
+        spec.at[0] + Math.sin(spec.yaw) * 0.65,
+        spec.at[1] + 3.99,
+        spec.at[2] + Math.cos(spec.yaw) * 0.65,
+      ],
+    })
+    visuals.push({
+      key: spec.key,
+      lever: pivot,
+      onLamp,
+      offLamp,
+      onText,
+      offText,
+    })
+
+    /* The plinth owns the largest footprint. Publish its rotated world box so
+     * collision stops a walker at the cabinet without editing collision.ts. */
+    const cos = Math.abs(Math.cos(spec.yaw))
+    const sin = Math.abs(Math.sin(spec.yaw))
+    const halfX = cos * 3.1 + sin * 1.4
+    const halfZ = sin * 3.1 + cos * 1.4
+    collisionBoxes.push(
+      new THREE.Box3(
+        new THREE.Vector3(spec.at[0] - halfX, spec.at[1], spec.at[2] - halfZ),
+        new THREE.Vector3(spec.at[0] + halfX, spec.at[1] + 6.42, spec.at[2] + halfZ),
+      ),
+    )
+  }
+  group.userData.collisionBoxes = collisionBoxes
+
+  function update(_dt: number, state: SimState): void {
+    for (let i = 0; i < visuals.length; i++) {
+      const visual = visuals[i]
+      const on = state.knobs[visual.key]
+      visual.lever.rotation.z = on ? -0.62 : 0.62
+      visual.onLamp.visible = on
+      visual.offLamp.visible = !on
+      visual.onText.visible = on
+      visual.offText.visible = !on
+    }
+  }
+
+  /* Initialise before the first rendered frame, including a restored/scenario
+   * value that differs from the default. */
+  update(0, ctx.sim)
+
+  function dispose(): void {
+    for (let i = 0; i < labelMaterials.length; i++) labelMaterials[i].dispose()
+    plateGeo.dispose()
+    knobGeo.dispose()
+  }
+
+  return { id: 'world.handles', group, handles, update, dispose }
+}
