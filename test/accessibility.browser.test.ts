@@ -27,12 +27,19 @@ describe('keyboard and screen-reader lesson routes', () => {
       readySelector: '.city-words',
       prepare: `(async () => {
         for (let attempt = 0; attempt < 120; attempt += 1) {
-          if (window.SSDSIMCITY && document.getElementById('boot')?.classList.contains('done')) break
+          const boot = document.getElementById('boot')
+          /* The boot overlay fades over 700ms; its visibility stays 'visible'
+           * for part of that window, which would let the touch audit measure
+           * the boot-screen correction link. Wait for the overlay to be truly
+           * non-interactive before measuring anything. */
+          if (window.SSDSIMCITY && boot?.classList.contains('done')
+            && getComputedStyle(boot).visibility === 'hidden') break
           await new Promise((resolve) => setTimeout(resolve, 100))
         }
         if (!window.SSDSIMCITY) throw new Error('SSDSimCity did not initialise')
-        if (!document.getElementById('boot')?.classList.contains('done')) {
-          throw new Error('SSDSimCity boot did not finish; touch audit would race finishBoot')
+        const boot = document.getElementById('boot')
+        if (!boot?.classList.contains('done') || getComputedStyle(boot).visibility !== 'hidden') {
+          throw new Error('SSDSimCity boot overlay never became non-interactive')
         }
       })()`,
     }], async ({ accessibilityTree, evaluate, keyPress, page, viewport }) => {
