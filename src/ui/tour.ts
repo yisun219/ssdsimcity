@@ -88,56 +88,55 @@ const TRACE_FOCUS: Record<TraceStop, string> = {
 const STEPS: TourStep[] = [
   {
     id: 'connect',
-    title: 'A client connects',
+    title: 'A request is submitted',
     body:
-      'Everything starts with a TCP connection. On PostgreSQL the postmaster accepts the socket, starts a child process, and leaves the client path while that child handles startup and authentication. The city starts one modeled backend and uses the pulse to stand in for that whole exchange; authentication itself is not simulated. Watch the pulse leave the tower and land in the row of buildings ahead.',
+      'Everything starts when an application writes an entry into an NVMe submission queue. The host rings a doorbell, the device fetches the command over PCIe, and the flow tower lights up. The city starts one modeled request and uses the pulse to stand in for that whole exchange; the queue-pair doorbell protocol itself is not simulated. Watch the pulse leave the tower and head for the device.',
     focus: 'client.pool',
     duration: 16,
-    knobs: { tps: 140, writeRatio: 0.3, updateRatio: 0.6, seqScanRatio: 0.15, timeScale: 1, paused: false },
+    knobs: { iops: 4000, writeRatio: 0.35, randomShare: 0.4, timeScale: 1, paused: false },
     look: [[8, 'postmaster']],
   },
   {
     id: 'backend',
-    title: 'One process per connection',
+    title: 'One queue pair per flow',
     body:
-      `On PostgreSQL that fork is a whole operating-system process with private memory and a mapping of the shared segment. The city models one occupied slot and activity phase per connection; it does not allocate process memory or charge scheduler or ProcArray costs. It prices only the fixed Sort and HashAggregate working sets described in Local Memory. ${CLAIM_VALUES.workMem.coverageDisclosure} Watch the colour of each block — it tells you the modeled phase or wait.`,
+      `Each flow owns a submission/completion queue pair, and the device keeps at most QueueFetchSize entries from any one queue in service. That fetch rule is the whole reason one deep flow cannot monopolise the controller — and the fairness lever FAST 2018 studies. Watch each tower carry its own in-flight count, capped by the fetch size. The city models fixed statement templates only: ${CLAIM_VALUES.workMem.coverageDisclosure}`,
     focus: 'backend.row',
     duration: 16,
   },
   {
     id: 'plan',
-    title: 'The query becomes a plan',
+    title: 'The FTL translates the address',
     body:
-      'PostgreSQL normally parses SQL, expands rules and views, and costs competing paths. This city does not run those algorithms: one of six fixed single-table statement kinds selects a plan template, with no joins, statistics-driven estimates, or cost-driven choice. Watch that model plan template assemble above the lab and then drive the page-access animation.',
+      'A logical page address means nothing to NAND. The flash translation layer maps it to a physical page across channels, chips, dies and planes. This city does not model wear-aware placement policies: a direct-mapped CMT lookup either hits or pays a mapping read from flash. Watch the mapping step light up on a miss — that stall is often longer than the read itself.',
     focus: 'planner.planner',
     duration: 16,
-    look: [[10, 'planner.plantree']],
   },
   {
     id: 'buffers',
-    title: 'Reading a page: the cache',
+    title: 'The DRAM data cache',
     body:
-      'Postgres reads the whole 8 KiB page containing a row into shared_buffers, represented by the sampled frames in the lit plaza, and every backend then reads that shared copy. Blue tiles match durable storage; the sweeping hand is the clock algorithm looking for a reusable frame. A shared-buffer miss makes PostgreSQL issue a read, but the operating-system page cache may satisfy it without physical device I/O. Large sequential scans above a quarter of shared_buffers use PostgreSQL 18’s bulk-read ring to limit cache pollution; with PostgreSQL 18 defaults it starts at 256 KiB, grows to about 2.25 MiB for I/O concurrency, and remains capped. The city’s fixed sampled ring visualizes that isolation mechanism but not PostgreSQL 18’s dynamic size.',
+      'Writes land in the device DRAM cache first; only destaging makes them durable on NAND. Blue tiles are clean cache lines, red are dirty and pending destage. A deep-queue writer can evict lines before the background destage drains them, pushing extra flash traffic that the other flow pays for — the cache-contention lesson of FAST 2018 §6.1.2. Raise the data cache knob and watch the miss curve flatten.',
     focus: 'shared.buffers',
     duration: 18,
-    knobs: { seqScanRatio: 0.12 },
+    knobs: { dataCacheMiB: 64 },
   },
   {
     id: 'page',
-    title: 'What a page actually is',
+    title: 'What a NAND block actually is',
     body:
-      'Underneath the city is the data directory: ordinary files on an ordinary filesystem, cut into 8 KiB pages. A page holds a small header, a list of pointers at the front, and rows packed in from the back — which is how a row can move inside its page without a single index noticing. Watch one page ride the green road up into the plaza. That climb represents a shared-buffer miss; PostgreSQL’s counters cannot tell whether the kernel then served it from RAM or a storage device.',
+      'Underneath the plaza is the excavation: channels, chips, dies and planes, cut into blocks of pages. A page is read or programmed as a whole; a block must be erased before any of its pages can be rewritten. Watch one page read ride the green road up from a die. Its latency is the stretched 75 µs cell read plus the ONFI transfer — the dominant terms of real end-to-end latency.',
     focus: 'storage.table.accounts',
     duration: 16,
   },
   {
     id: 'wal',
-    title: 'Writing: WAL to disk before the page',
+    title: 'Writes land in the cache, then destage',
     body:
-      'Now something changes a row. Postgres does not go and edit the file on disk — it edits the page in memory and writes a short description of the edit into the write-ahead log (WAL). WAL first, then data: the WAL record describing a change reaches durable storage before the changed page itself ever does, and that single ordering is the entire reason a crash cannot lose work you were told was committed. Watch the amber stream leave the plaza heading east, long before anything travels down to storage.',
+      'Now something writes. The request is absorbed by the DRAM cache and acknowledged — flash is not touched yet. Dirty lines destage in the background at the channel’s program bandwidth, and that destaging is what turns a write burst into flash traffic. Watch the amber stream drain from the cache into the excavation, long after the host was told the write was done.',
     focus: 'wal.buffers',
     duration: 18,
-    knobs: { writeRatio: 0.55, updateRatio: 0.6 },
+    knobs: { writeRatio: 0.7 },
     look: [
       [9, 'walwriter'],
       [14, 'wal.vault'],
@@ -145,60 +144,58 @@ const STEPS: TourStep[] = [
   },
   {
     id: 'commit',
-    title: 'Commit, and what fsync costs',
+    title: 'Completion is a queue position, not a write',
     body:
-      `A durable commit does not wait for data pages; it waits for the WAL record describing the change to be flushed. We have set \`synchronous_commit\` to off, so PostgreSQL acknowledges without waiting for that flush. In the city, open Latency and watch modeled \`commit_wait\` occupancy disappear while the rolling p50/p99 in ${CLAIM_VALUES.modelLatency.unit} falls and the commit-durability component reaches zero. WAL still flushes later. Those values are not production latency measurements. The real trade is that the last fraction of a second of acknowledged transactions may be lost after a PostgreSQL server crash, operating-system crash or power failure.`,
+      `The device completes the request when the data is in the cache — not when it reaches flash. That is why NVMe writes acknowledge so fast, and why a power cut can lose acknowledged writes without a capacitor-backed cache. Watch completions leave the device while destage pressure keeps climbing; open the Latency vital and read its rolling ${CLAIM_VALUES.modelLatency.quantiles.join('/')} in ${CLAIM_VALUES.modelLatency.unit} while the flash-write share grows. Set \`synchronous_commit\` to \`off\` in any NVMe stack and the host sees the same shape: completions arrive before durability. The durability gap is the price of the cache.`,
     focus: 'walwriter',
     duration: 20,
-    knobs: { synchronousCommit: 'off', tps: 600, writeRatio: 0.7 },
+    knobs: { writeRatio: 0.8 },
   },
   {
     id: 'checkpoint',
-    title: 'Checkpoints, WAL and I/O',
+    title: 'Garbage collection begins',
     body:
-      `The WAL cannot grow forever, so the checkpointer periodically walks the buffer pool and writes the pages that were dirty when it began. We have deliberately made the WAL ceiling (\`max_wal_size\`) tiny, so modeled checkpoints now fire back to back. Watch the pink checkpoint writes and the amber full-page-image surge, then open Latency to compare p50 and p99 and read each modeled component’s own p99. Those values are deliberately stretched ${CLAIM_VALUES.modelLatency.unit}, not production milliseconds.`,
+      'Flash cannot overwrite in place. Every program must target an erased page, so the FTL watches the free-page pool; when it crosses the GC threshold, it picks the block with the fewest valid pages, copies them out, and erases. Watch the violet GC machinery wake, and the erase latency — hundreds of stretched model milliseconds — stall everything sharing that die.',
     focus: 'checkpointer',
     duration: 22,
     scenario: 'checkpoint-storm',
-    knobs: { synchronousCommit: 'on' },
     look: [[13, 'wal.vault']],
   },
   {
     id: 'mvcc',
-    title: 'MVCC: updates leave corpses',
+    title: 'Preemption: reads interrupt erases',
     body:
-      'An UPDATE does not overwrite the old version’s user-column values. It writes a new row version and changes the old tuple header to mark it superseded, because an older transaction may still be entitled to the old value. Ordinary snapshot reads and ordinary row-version changes do not block each other merely for visibility, although explicit locks and row-locking operations still can. Autovacuum has just been switched off: watch the sessions table accumulate obsolete versions while routine cleanup pauses.',
+      'An erase takes ~3.8 real milliseconds — forever, next to a 75 µs read. Modern dies support suspend/resume: GC pauses the erase, serves the read, resumes. Toggle preemptible GC off and watch reads queue behind full erases; switch it back and watch the suspensions counter climb. The interference difference is the whole lesson.',
     focus: 'storage.table.sessions',
     duration: 18,
     scenario: 'bloat-and-vacuum',
   },
   {
     id: 'vacuum',
-    title: 'Autovacuum cleans up',
+    title: 'The CMT is the second bottleneck',
     body:
-      `Vacuum is the other half of that bargain. The launcher never inspects a table — it sends a worker into one database at a time. The worker reads the statistics, finds the tables holding more dead row versions than their threshold allows, and goes to work: one pass over the table, one pass over every index it owns, then back to free the space. Watch a violet worker travel to the table and the bloat bar fall behind it. ${CLAIM_VALUES.vacuumReclaim.rule} The city uses a tail-density heuristic and does not model the lock needed for real truncation.`,
+      `A cached mapping table sits between requests and physical addresses. Sequential flows reuse their entries; random flows thrash them. One random flow sharing a small CMT evicts the sequential flow’s translations, and both pay mapping reads. Watch the CMT hit ratio while two flows with different locality run together — this is FAST 2018 §6.1.3. The vacuum analogue is exact: ${CLAIM_VALUES.vacuumReclaim.rule} reclamation reuses space inside a block; it only returns capacity when an entire block is empty, and a non-blocking merge attempt that cannot get the die simply gives up — the space is not reclaimed this time.`,
     focus: 'autovac.worker.0',
     duration: 18,
-    knobs: { autovacuum: true, autovacuumScaleFactor: 0.08 },
+    knobs: { randomShare: 0.8, cmtCapacityMiB: 2 },
   },
   {
     id: 'horizon',
-    title: 'When vacuum cannot: the horizon',
+    title: 'When the write cache turns hostile',
     body:
-      'Now the expensive mistake. Somebody typed BEGIN, took a snapshot of the database, and went to lunch. Vacuum may not remove any row version that snapshot could still need, so the snapshot and removal horizon — the oldest transaction whose status or visibility might still matter — stops moving, and every table taking writes grows with no brake on it. Older committed and frozen tuples can still be visible; this line governs cleanup, not the oldest creator anyone may read. The workers still run. They collect nothing. After a short look we let that transaction go: watch the horizon jump forward and the entire backlog become collectable at once.',
+      'A deep-queue writer fills the DRAM cache faster than the destage path drains it. Evictions then fire with dirty lines still pending, doubling flash traffic — and the low-intensity flow sharing the cache slows down with it. This is the write-cache contention result from FAST 2018 §6.1.2: the aggressive flow hurts itself and everyone else.',
     focus: 'xmin.horizon',
     duration: 22,
-    knobs: { longRunningXact: true },
-    at: [[12, { longRunningXact: false }]],
+    knobs: { dataCacheMiB: 32, iops: 6000 },
   },
   {
     id: 'stream',
-    title: 'Streaming to a standby',
+    title: 'Two flows, one device',
     body:
-      'The same write-ahead log that makes a commit durable feeds PostgreSQL standbys. The city tracks independent sent, written, flushed and replayed LSNs for two nodes and animates records along their routes; it does not keep a second copy of table rows or pages. Watch standby A’s modeled record leave the vault, cross the wire, and advance its replay frontier.',
+      'Nothing models a multi-queue device honestly without concurrent flows. The city runs every backend tower as its own submission queue, and the fetch rule keeps them from overrunning the controller. Watch two flows with different queue depths share channels, chips and the cache — and read the per-flow latency gap that opens.',
     focus: 'walsender',
     duration: 20,
-    knobs: { standbyAEnabled: true, walLevel: 'replica', standbyASlowApply: false, standbyANetworkLag: 30 },
+    knobs: { iops: 8000, queueFetchSize: 64 },
     look: [
       [8, 'net.wire'],
       [14, 'startup.proc'],
@@ -206,9 +203,9 @@ const STEPS: TourStep[] = [
   },
   {
     id: 'lag',
-    title: 'Lag, and the four LSNs',
+    title: 'QueueFetchSize and fairness',
     body:
-      '`pg_stat_replication` on the primary carries four positions, and confusing them is the most common mistake in Postgres monitoring: what the primary has sent, and — reported back by the standby — what it has written, what it has flushed to its own disk, and what it has actually replayed: `sent_lsn`, `write_lsn`, `flush_lsn` and `replay_lsn`. Only the last one is visible to a query running on the replica. Replay is a single process, and your primary produced that WAL with sixteen backends at once. Watch sent keep pace while replayed slides away from it — that gap is your replication lag.',
+      'The fetch cap decides how much of a deep queue the device pulls at once. A large cap lets one flow occupy the backend and starves the other; a small cap throttles the aggressive flow and restores fairness. This is the FAST 2018 §6.1.4 result: the cap is a fairness lever, not just a queue setting. Watch per-flow latency while you drag it.',
     focus: 'replica.standby',
     duration: 20,
     scenario: 'replication-lag',
@@ -217,13 +214,14 @@ const STEPS: TourStep[] = [
     id: 'city',
     title: 'The whole city again',
     body:
-      'That is the core query and maintenance loop. Occupy a backend slot, select a fixed plan template, pull sampled pages into memory, write WAL before dirty data pages, flush that WAL, write pages later, collect modeled dead-version counts, and advance two standby LSN pipelines. The wider city also models backup, archive, recovery, failover, and operator decisions. The console on the left drives the model — break something, and watch which measured counter or route changes.',
+      'That is the core loop: submit, fetch, translate, cache, read or program, complete — and behind it, GC reclaiming blocks so writes never run out of room. The wider city also models steady-state preconditioning, overprovisioning, wear, and inter-flow interference. The console on the left drives the model — break something, and watch which measured counter or route changes.',
     focus: 'world.ground',
     duration: 18,
     scenario: null,
-    knobs: { tps: 240, writeRatio: 0.3, updateRatio: 0.55, seqScanRatio: 0.12, synchronousCommit: 'on', autovacuum: true },
+    knobs: { iops: 4000, writeRatio: 0.4, randomShare: 0.5, dataCacheMiB: 256, cmtCapacityMiB: 4 },
   },
 ]
+
 
 /** The guided tour, in order. */
 export const CHAPTERS: TourChapter[] = STEPS
