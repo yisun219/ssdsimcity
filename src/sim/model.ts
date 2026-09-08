@@ -8811,6 +8811,17 @@ export function createSim(bus: Bus, options: Readonly<SimOptions> = {}): SimApi 
       refreshRepresentativeRow(tables[i].mvcc, state.xminHorizon)
     }
 
+    // One modeled statement touches about four device pages; the device knob
+    // stays authoritative when set, and the tps dial otherwise drives it.
+    if (K.iops === DEFAULT_KNOBS.iops) {
+      K.iops = Math.max(1, Math.round(K.tps * 4))
+    }
+    ssdEngine.syncKnobs(K)
+    for (let slot = 0; slot < N_BACKEND_SLOTS; slot++) {
+      ssdEngine.state.flows[slot].active = backends[slot].active
+    }
+    ssdEngine.update(dt)
+
     tickStats(dt)
   }
 

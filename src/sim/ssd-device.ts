@@ -346,7 +346,34 @@ export class SsdDeviceEngine {
    * Steady-state tick. `dt` is model seconds.
    * ----------------------------------------------------------------------*/
 
-  update(dt: number, flowActivity: number[]): void {
+  /**
+   * Pull the SSD-relevant fields out of the city's Knobs each tick. The
+   * device engine stays the single writer of its own state; this is the one
+   * sanctioned inlet from the console rail.
+   */
+  syncKnobs(city: SsdKnobs): void {
+    this.knobs.queueFetchSize = Math.max(1, Math.round(city.queueFetchSize))
+    this.knobs.dataCacheMiB = city.dataCacheMiB
+    this.knobs.cmtCapacityMiB = city.cmtCapacityMiB
+    this.knobs.overprovisioning = city.overprovisioning
+    this.knobs.gcExecThreshold = city.gcExecThreshold
+    this.knobs.gcHardThreshold = city.gcHardThreshold
+    this.knobs.preemptibleGc = city.preemptibleGc
+    this.knobs.writeRatio = city.writeRatio
+    this.knobs.randomShare = city.randomShare
+    this.knobs.requestSizeKiB = city.requestSizeKiB
+    this.knobs.iops = Math.max(0, city.iops)
+    this.knobs.cacheSharing = city.cacheSharing
+    this.knobs.readCacheMode = city.readCacheMode
+    this.knobs.schedulingPolicy = city.schedulingPolicy
+    this.state.hostInterface.queueFetchSize = this.knobs.queueFetchSize
+    this.state.writeCache.capacityBytes = this.knobs.dataCacheMiB * 1024 * 1024
+    this.state.cmt.capacity = Math.floor((this.knobs.cmtCapacityMiB * 1024 * 1024) / 8)
+    this.state.overprovisioning = this.knobs.overprovisioning
+    this.state.gc.preemptible = this.knobs.preemptibleGc
+  }
+
+  update(dt: number, flowActivity: number[] = []): void {
     this.knobs.queueFetchSize = Math.max(1, Math.round(this.knobs.queueFetchSize))
     this.generateArrivals(dt)
     this.serviceRequests(dt, flowActivity)
