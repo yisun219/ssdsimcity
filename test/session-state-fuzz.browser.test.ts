@@ -38,7 +38,7 @@ function storedPage(
   auxiliary: Record<string, string> = {},
 ): StoredPage {
   const records = {
-    'pgsimcity.knobs': JSON.stringify(knobs),
+    'ssdsimcity.knobs': JSON.stringify(knobs),
     ...auxiliary,
   }
   return {
@@ -73,12 +73,12 @@ describe('persisted state in a production phone bootstrap', () => {
   it('loads the minimized accumulated-state recipes into a live city', async () => {
     const pages = [
       storedPage('sanitised auxiliary state', { paused: true, tps: 0 }, 0, 10, {
-        'pgsimcity.theme': 'retired-neon-theme',
-        'pgsimcity.audio': JSON.stringify({ enabled: 'yes', volume: 'loud' }),
-        'pgsimcity.seen': 'corrupt',
-        'pgsimcity.rotate-hint.dismissed': 'corrupt',
-        'pgsimcity.console.open': '1',
-        'pgsimcity.inspector.open': '1',
+        'ssdsimcity.theme': 'retired-neon-theme',
+        'ssdsimcity.audio': JSON.stringify({ enabled: 'yes', volume: 'loud' }),
+        'ssdsimcity.seen': 'corrupt',
+        'ssdsimcity.rotate-hint.dismissed': 'corrupt',
+        'ssdsimcity.console.open': '1',
+        'ssdsimcity.inspector.open': '1',
       }),
       storedPage('remaining failover candidate', {
         tps: 120,
@@ -130,7 +130,7 @@ describe('persisted state in a production phone bootstrap', () => {
           restoredTps: sim.state.knobs.tps,
           leader: sim.state.highAvailability.currentLeader,
           sheets: document.querySelectorAll('.pgc-host.is-compact.is-open').length,
-          storedKnobs: JSON.parse(localStorage.getItem('pgsimcity.knobs') || '{}'),
+          storedKnobs: JSON.parse(localStorage.getItem('ssdsimcity.knobs') || '{}'),
           terminalToasts: toasts.filter((text) => /${TERMINAL_TOAST}/i.test(text)),
           errors: window.__pgSessionStateErrors,
         }

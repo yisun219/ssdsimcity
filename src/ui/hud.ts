@@ -89,7 +89,7 @@ const TRACE_RAIL: readonly TraceStop[] = [
   'done',
 ]
 
-type VitalKey = 'tps' | 'latency' | 'wal' | 'dirty' | 'lag'
+type VitalKey = 'iops' | 'latency' | 'flashWrite' | 'cacheDirty' | 'flowSkew'
 
 export const MODEL_LATENCY_VITAL_LABEL = `Latency p50 / p99 · ${CLAIM_VALUES.modelLatency.unit}`
 
@@ -103,39 +103,39 @@ interface VitalDef {
 
 const VITALS: VitalDef[] = [
   {
-    key: 'tps',
-    label: `TPS · ${TPS_MEASUREMENT_WINDOW_SECONDS}s`,
+    key: 'iops',
+    label: `IOPS · ${TPS_MEASUREMENT_WINDOW_SECONDS}s`,
     focus: 'backend.row',
     color: cssColor('backend'),
-    hint: `Transactions committed per second over the trailing ${TPS_MEASUREMENT_WINDOW_SECONDS} model seconds. Falls below the offered rate when the server is saturated.`,
+    hint: `Device requests completed per second over the trailing ${TPS_MEASUREMENT_WINDOW_SECONDS} model seconds. Falls below the offered rate when the controller or GC is saturated.`,
   },
   {
     key: 'latency',
     label: MODEL_LATENCY_VITAL_LABEL,
     focus: 'backend.row',
     color: cssColor('backend'),
-    hint: `Weighted response-time quantiles over the rolling model window; ${CLAIM_VALUES.modelLatency.batchDisclosure}; ${CLAIM_VALUES.modelLatency.resolutionDisclosure}. Click for independent p99 component quantiles.`,
+    hint: `Weighted end-to-end response-time quantiles over the rolling model window; ${CLAIM_VALUES.modelLatency.batchDisclosure}; ${CLAIM_VALUES.modelLatency.resolutionDisclosure}. Click for independent p99 component quantiles.`,
   },
   {
-    key: 'wal',
-    label: 'WAL',
+    key: 'flashWrite',
+    label: 'Flash writes',
     focus: 'wal.vault',
     color: cssColor('wal'),
-    hint: 'Write-ahead log bytes produced per second. Compare it against max_wal_size to predict the next checkpoint.',
+    hint: 'Bytes per second crossing the cache→flash destage boundary, plus GC valid-page copies. Host writes can be absorbed by the cache long before this moves — watch it during a GC cycle.',
   },
   {
-    key: 'dirty',
-    label: 'Dirty sample',
+    key: 'cacheDirty',
+    label: 'Dirty cache',
     focus: 'shared.buffers',
     color: cssColor('bufDirty'),
-    hint: 'Sampled frames modified in memory and not yet written to disk. Somebody has to pay for these eventually.',
+    hint: 'Device DRAM cache lines holding writes not yet destaged to NAND. A full dirty pool forces evictions to do their own destaging first.',
   },
   {
-    key: 'lag',
-    label: 'Repl lag',
+    key: 'flowSkew',
+    label: 'Flow skew',
     focus: 'replica.standby',
     color: cssColor('replication'),
-    hint: 'The larger replay lag of standby_a and standby_b. Each node has its own received, flushed, and applied position.',
+    hint: 'The slowest active flow’s mean latency versus the fleet’s. A rising skew is inter-flow interference: cache thrash, CMT eviction or GC sharing a die.',
   },
 ]
 
@@ -261,46 +261,54 @@ function worstStandby(s: SimState): SimState['replication']['standbys'][number] 
 }
 
 function health(s: SimState): Health {
-  if (s.disasterRecovery.archive.writesBlocked) return 'crit'
-  const pgWalFill =
-    s.disasterRecovery.archive.pgWalBytes
-    / Math.max(1, s.disasterRecovery.archive.pgWalCapacityBytes)
-  if (pgWalFill >= 0.95) return 'crit'
-  if (s.checkpoint.phase !== 'idle' && s.checkpoint.reason === 'wal') return 'crit'
-  if (s.locks.length >= 3) return 'crit'
-  if (pgWalFill >= 0.8) return 'warn'
-  if (s.stats.cacheHitPct < 50) return 'warn'
-  const standby = worstStandby(s)
-  if (standby && (standby.lagSec > 5 || lagClimbing(s.stats.history.lag))) return 'warn'
-  if (s.buffers.sampleFrames > 0 && s.buffers.dirtyCount / s.buffers.sampleFrames > 0.7) return 'warn'
+  const ssd = s.ssd
+  if (ssd.gc.phase !== 'idle' && ssd.gc.freePageRatio < 0.02) return 'crit'
+  if (ssd.writeCache.usedBytes >= ssd.writeCache.capacityBytes && ssd.writeCache.hitRatio < 0.3) return 'crit'
+  if (ssd.gc.phase !== 'idle') return 'warn'
+  if (ssd.writeCache.hitRatio < 0.5) return 'warn'
+  if (ssd.freePageRatio < s.knobs.gcExecThreshold) return 'warn'
+  const flows = ssd.flows.filter((f) => f.active)
+  if (flows.length >= 2) {
+    const lat = flows.map((f) => f.latencyMs)
+    const fastest = Math.min(...lat)
+    const slowest = Math.max(...lat)
+    if (fastest > 0 && slowest / fastest > 4) return 'warn'
+  }
   return 'ok'
 }
 
 function healthReason(s: SimState, h: Health): string {
-  if (s.disasterRecovery.archive.writesBlocked)
-    return 'Primary WAL volume reached its scaled safety limit — writes are rejected'
-  const pgWalFill =
-    s.disasterRecovery.archive.pgWalBytes
-    / Math.max(1, s.disasterRecovery.archive.pgWalCapacityBytes)
-  if (pgWalFill >= 0.8)
-    return `Primary pg_wal is ${(pgWalFill * 100).toFixed(0)}% of its scaled safety capacity`
-  if (s.checkpoint.phase !== 'idle' && s.checkpoint.reason === 'wal')
-    return 'Checkpoint triggered by WAL volume — max_wal_size is being outrun'
-  if (s.locks.length >= 3) return `${s.locks.length} backends waiting on a heavyweight lock`
-  if (s.stats.cacheHitPct < 50) return `Cache hit ratio ${s.stats.cacheHitPct.toFixed(1)}% — most reads are going to storage`
-  const standby = worstStandby(s)
-  if (standby && standby.lagSec > 5) return `${standby.applicationName} is ${standby.lagSec.toFixed(1)}s behind`
-  if (standby && lagClimbing(s.stats.history.lag)) return 'Replication lag is climbing'
-  if (h === 'warn') return 'Most sampled buffer frames are dirty'
+  const ssd = s.ssd
+  if (ssd.gc.phase !== 'idle' && ssd.gc.freePageRatio < 0.02)
+    return 'Free-page pool is nearly empty mid-GC — the device cannot allocate fresh pages'
+  if (ssd.writeCache.usedBytes >= ssd.writeCache.capacityBytes && ssd.writeCache.hitRatio < 0.3)
+    return 'The write cache is full and thrashing — every eviction pays a flash write'
+  if (ssd.gc.phase !== 'idle')
+    return `Garbage collection is ${ssd.gc.phase.replace('_', ' ')} — user I/O shares the die with it`
+  if (ssd.writeCache.hitRatio < 0.5)
+    return `Write-cache hit ratio ${(ssd.writeCache.hitRatio * 100).toFixed(0)}% — the working set outruns the cache`
+  if (ssd.freePageRatio < s.knobs.gcExecThreshold)
+    return `Free-page pool at ${(ssd.freePageRatio * 100).toFixed(0)}% — GC will trigger soon`
+  const flows = ssd.flows.filter((f) => f.active)
+  if (flows.length >= 2) {
+    const lat = flows.map((f) => f.latencyMs)
+    const fastest = Math.min(...lat)
+    const slowest = Math.max(...lat)
+    if (fastest > 0 && slowest / fastest > 4)
+      return 'One flow’s latency is far above the fleet’s — inter-flow interference'
+  }
+  if (h === 'warn') return 'Device pressure is elevated'
   return 'Nothing dramatic is happening'
 }
 
 export function vitalValue(key: VitalKey, s: SimState): { text: string; state: State } {
   switch (key) {
-    case 'tps': {
-      const offered = Math.max(1, s.knobs.tps)
-      const ratio = s.stats.tps / offered
-      return { text: fmtNum(s.stats.tps), state: ratio < 0.4 ? 'crit' : ratio < 0.72 ? 'warn' : '' }
+    case 'iops': {
+      const ssd = s.ssd
+      const done = ssd.flows.reduce((n, f) => n + f.reads + f.writes, 0)
+      const offered = Math.max(1, s.knobs.iops)
+      const ratio = done / offered
+      return { text: fmtNum(done), state: ratio < 0.4 ? 'crit' : ratio < 0.72 ? 'warn' : '' }
     }
     case 'latency': {
       const { p50, p99 } = s.stats.latency
@@ -310,29 +318,36 @@ export function vitalValue(key: VitalKey, s: SimState): { text: string; state: S
         state: '',
       }
     }
-    case 'wal': {
-      const bps = s.wal.bytesPerSec
-      const fillSec = bps > 1 ? (s.knobs.maxWalSize * 1024 * 1024) / bps : Infinity
-      // A rate carries its time component in the value, not only in the label.
-      return { text: `${fmtBytes(bps)}/s`, state: fillSec < 12 ? 'crit' : fillSec < 40 ? 'warn' : '' }
+    case 'flashWrite': {
+      const bps = s.ssd.writeCache.destageBytesPerSec
+      return { text: `${fmtBytes(bps)}/s`, state: '' }
     }
-    case 'dirty': {
-      const d = s.buffers.dirtyCount
-      const r = s.buffers.sampleFrames > 0 ? d / s.buffers.sampleFrames : 0
-      return { text: fmtNum(d), state: r > 0.75 ? 'crit' : r > 0.5 ? 'warn' : '' }
+    case 'cacheDirty': {
+      const c = s.ssd.writeCache
+      const fill = c.capacityBytes > 0 ? c.dirtyBytes / c.capacityBytes : 0
+      return {
+        text: fmtBytes(c.dirtyBytes),
+        state: fill > 0.9 ? 'crit' : fill > 0.7 ? 'warn' : '',
+      }
     }
-    case 'lag': {
-      const standby = worstStandby(s)
-      if (!standby) return { text: '—', state: '' }
-      const v = standby.lagSec
-      return { text: `${v.toFixed(1)}s`, state: v > 20 ? 'crit' : v > 5 ? 'warn' : '' }
+    case 'flowSkew': {
+      const flows = s.ssd.flows.filter((f) => f.active && f.latencyMs > 0)
+      if (flows.length < 2) return { text: '—', state: '' }
+      const fastest = Math.min(...flows.map((f) => f.latencyMs))
+      const slowest = Math.max(...flows.map((f) => f.latencyMs))
+      const skew = fastest > 0 ? slowest / fastest : 0
+      return { text: `${skew.toFixed(1)}×`, state: skew > 8 ? 'crit' : skew > 4 ? 'warn' : '' }
     }
   }
 }
 
 function vitalHistory(key: VitalKey, s: SimState): number[] {
   const h = s.stats.history
-  const src = key === 'tps' ? h.tps : key === 'latency' ? h.latencyP99 : key === 'wal' ? h.wal : key === 'dirty' ? h.dirty : h.lag
+  const src = key === 'iops' ? h.tps
+    : key === 'latency' ? h.latencyP99
+    : key === 'flashWrite' ? h.wal
+    : key === 'cacheDirty' ? h.dirty
+    : h.lag
   return src
 }
 

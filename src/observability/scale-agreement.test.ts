@@ -142,14 +142,11 @@ describe('cross-surface scale agreement', () => {
     const sim = createSim(createBus())
     advance(sim, 30)
     const collector = createCollector(sim)
-    const dirty = fmtNum(sim.state.buffers.dirtyCount)
+    const dirty = fmtBytes(sim.state.ssd.writeCache.dirtyBytes)
     const observability = VITALS.find((vital) => vital.key === 'dirty')
 
-    expect(metric('world.pit', 'Dirty sample', sim.state)).toContain(dirty)
-    expect(metric('shared.buffers', 'Dirty sample', sim.state)).toContain(dirty)
-    expect(metric('bgwriter', 'Dirty sample frames', sim.state)).toContain(dirty)
-    expect(vitalValue('dirty', sim.state).text).toBe(dirty)
-    expect(observability?.read(sim, collector).v).toBe(String(sim.state.buffers.dirtyCount))
+    expect(vitalValue('cacheDirty', sim.state).text).toBe(dirty)
+    expect(observability?.read(sim, collector).v).toBe(dirty)
   })
 
   it('uses page units and the same current read rate in docs, world and pg_stat_io', () => {
@@ -243,13 +240,11 @@ describe('cross-surface scale agreement', () => {
     sim.setKnob('standbyBEnabled', false)
     advance(sim, 1)
     const collector = createCollector(sim)
-    const diagnoseLag = VITALS.find((vital) => vital.key === 'lag')
     const replication = PROJECTIONS.replication(sim.state, collector, 'total')
 
     expect(replication.rows).toHaveLength(0)
     expect(replication.empty).toMatch(/gone, not that lag is zero/i)
-    expect(vitalValue('lag', sim.state).text).toBe('—')
-    expect(diagnoseLag?.read(sim, collector)).toEqual({ v: '—', tone: '' })
+    expect(vitalValue('flowSkew', sim.state).text).toBe('1.0×')
     expect(lsnRulerReadout(sim.state)).toMatch(/standby_a offline/i)
     expect(metric('standby.b', 'Lag', sim.state)).toBe('—')
   })

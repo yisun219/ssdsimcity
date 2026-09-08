@@ -240,22 +240,23 @@ export const VITALS: Vital[] = [
   },
   {
     key: 'dirty',
-    label: 'dirty sample',
+    label: 'dirty cache',
     color: 'var(--c-buffer-dirty)',
-    read: (sim) => ({ v: String(sim.state.buffers.dirtyCount), tone: '' }),
+    read: (sim) => ({ v: fmtBytes(sim.state.ssd.writeCache.dirtyBytes), tone: '' }),
     history: (sim) => sim.state.stats.history.dirty,
     min: 0,
   },
   {
     key: 'lag',
-    label: 'replay lag',
+    label: 'flow skew',
     color: 'var(--c-replication)',
     read: (sim) => {
-      const a = sim.state.replication.standbys[0]
-      const b = sim.state.replication.standbys[1]
-      if (!a.connected && !b.connected) return { v: '—', tone: '' }
-      const v = Math.max(a.connected ? a.lagSec : 0, b.connected ? b.lagSec : 0)
-      return { v: `${v.toFixed(2)} s`, tone: v > 8 ? 'crit' : v > 2 ? 'warn' : 'ok' }
+      const flows = sim.state.ssd.flows.filter((f) => f.active && f.latencyMs > 0)
+      if (flows.length < 2) return { v: '—', tone: '' }
+      const fastest = Math.min(...flows.map((f) => f.latencyMs))
+      const slowest = Math.max(...flows.map((f) => f.latencyMs))
+      const skew = slowest / fastest
+      return { v: `${skew.toFixed(1)}×`, tone: skew > 8 ? 'crit' : skew > 4 ? 'warn' : 'ok' }
     },
     history: (sim) => sim.state.stats.history.lag,
     min: 0,
