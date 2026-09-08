@@ -68,6 +68,15 @@
 
 .pg-version-qualification[open] > .pg-correction__link {
   display: inline-block;
+  /* The touch-target floor is unconditional: emulated mobile browsers set
+     touch points without flipping the pointer media query, so a media-gated
+     tap size flakes the accessibility audit. Negative margins keep the 44px
+     hit area without disturbing the surrounding line box. */
+  min-width: var(--tap);
+  min-height: var(--tap);
+  padding: 8px 10px;
+  margin: -8px -10px;
+  box-sizing: content-box;
 }
 
 .pg-correction__link {

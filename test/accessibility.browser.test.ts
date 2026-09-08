@@ -25,6 +25,12 @@ describe('keyboard and screen-reader lesson routes', () => {
       name: 'City in words',
       path: '/',
       readySelector: '.city-words',
+      prepare: `(async () => {
+        for (let attempt = 0; attempt < 120 && !window.SSDSIMCITY; attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 100))
+        }
+        if (!window.SSDSIMCITY) throw new Error('SSDSimCity did not initialise')
+      })()`,
     }], async ({ accessibilityTree, evaluate, keyPress, page, viewport }) => {
       await keyPress('/', { code: 'Slash' })
       await evaluate(`(() => {
