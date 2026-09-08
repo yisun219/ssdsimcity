@@ -774,7 +774,8 @@ export function createSim(bus: Bus, options: Readonly<SimOptions> = {}): SimApi 
     retainedBytes: 0,
   }
 
-  const ssdEngine = new SsdDeviceEngine(DEFAULT_KNOBS, N_BACKEND_SLOTS)
+  let iopsExplicit = false
+const ssdEngine = new SsdDeviceEngine(DEFAULT_KNOBS, N_BACKEND_SLOTS)
 
   const state: SimState = {
     t: 0,
@@ -8711,6 +8712,7 @@ export function createSim(bus: Bus, options: Readonly<SimOptions> = {}): SimApi 
         break
       case 'iops':
         K.iops = Math.max(0, K.iops)
+        iopsExplicit = K.iops !== DEFAULT_KNOBS.iops
         break
       case 'requestSizeKiB':
         K.requestSizeKiB = clamp(K.requestSizeKiB, 4, 128)
@@ -8811,12 +8813,14 @@ export function createSim(bus: Bus, options: Readonly<SimOptions> = {}): SimApi 
       refreshRepresentativeRow(tables[i].mvcc, state.xminHorizon)
     }
 
-    // One modeled statement touches about four device pages; the device knob
-    // stays authoritative when set, and the tps dial otherwise drives it.
-    if (K.iops === DEFAULT_KNOBS.iops) {
-      K.iops = Math.max(1, Math.round(K.tps * 4))
-    }
-    ssdEngine.syncKnobs(K)
+    // One modeled statement touches about four device pages. The tps dial
+    // drives the device rate until the user sets IOPS explicitly; the bridge
+    // feeds the engine only, so K.iops keeps meaning user intent and stored
+    // preferences round-trip without a phantom rejection.
+    const deviceIops = iopsExplicit || K.iops !== DEFAULT_KNOBS.iops
+      ? K.iops
+      : Math.max(1, Math.round(K.tps * 4))
+    ssdEngine.syncKnobs(K, deviceIops)
     for (let slot = 0; slot < N_BACKEND_SLOTS; slot++) {
       ssdEngine.state.flows[slot].active = backends[slot].active
     }
@@ -8856,6 +8860,7 @@ export function createSim(bus: Bus, options: Readonly<SimOptions> = {}): SimApi 
 
   function hardReset(): void {
     Object.assign(K, DEFAULT_KNOBS)
+    iopsExplicit = false
     liveDeficit = 0
     state.t = 0
     state.realT = 0

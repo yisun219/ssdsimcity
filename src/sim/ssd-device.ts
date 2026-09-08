@@ -351,7 +351,7 @@ export class SsdDeviceEngine {
    * device engine stays the single writer of its own state; this is the one
    * sanctioned inlet from the console rail.
    */
-  syncKnobs(city: SsdKnobs): void {
+  syncKnobs(city: SsdKnobs, deviceIops?: number): void {
     this.knobs.queueFetchSize = Math.max(1, Math.round(city.queueFetchSize))
     this.knobs.dataCacheMiB = city.dataCacheMiB
     this.knobs.cmtCapacityMiB = city.cmtCapacityMiB
@@ -362,7 +362,7 @@ export class SsdDeviceEngine {
     this.knobs.writeRatio = city.writeRatio
     this.knobs.randomShare = city.randomShare
     this.knobs.requestSizeKiB = city.requestSizeKiB
-    this.knobs.iops = Math.max(0, city.iops)
+    this.knobs.iops = Math.max(0, deviceIops ?? city.iops)
     this.knobs.cacheSharing = city.cacheSharing
     this.knobs.readCacheMode = city.readCacheMode
     this.knobs.schedulingPolicy = city.schedulingPolicy

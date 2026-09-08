@@ -85,7 +85,7 @@ describe('user-facing timebase', () => {
     expect(document.querySelector('.tour-card__n')?.textContent).toBe('7')
     expect(document.querySelector('.tour-card__of')?.textContent).toBe('of 14')
     expect(ctx.sim.state.scenario).toBeNull()
-    expect(ctx.sim.state.knobs.synchronousCommit).toBe('off')
+    expect(ctx.sim.state.knobs.writeRatio).toBe(0.8)
     expect(focuses.at(-1)).toBe('walwriter')
     tour.dispose()
   })

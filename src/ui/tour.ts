@@ -90,7 +90,7 @@ const STEPS: TourStep[] = [
     id: 'connect',
     title: 'A request is submitted',
     body:
-      'Everything starts when an application writes an entry into an NVMe submission queue. The host rings a doorbell, the device fetches the command over PCIe, and the flow tower lights up. The city starts one modeled request and uses the pulse to stand in for that whole exchange; the queue-pair doorbell protocol itself is not simulated. Watch the pulse leave the tower and head for the device.',
+      'Everything starts when an application writes an entry into an NVMe submission queue. The host rings a doorbell, the device fetches the command over PCIe, and the flow tower lights up. The city starts one modeled request and uses the pulse to stand in for that whole exchange; authentication is not simulated. Watch the pulse leave the tower and head for the device.',
     focus: 'client.pool',
     duration: 16,
     knobs: { iops: 4000, writeRatio: 0.35, randomShare: 0.4, timeScale: 1, paused: false },
@@ -108,7 +108,7 @@ const STEPS: TourStep[] = [
     id: 'plan',
     title: 'The FTL translates the address',
     body:
-      'A logical page address means nothing to NAND. The flash translation layer maps it to a physical page across channels, chips, dies and planes. This city does not model wear-aware placement policies: a direct-mapped CMT lookup either hits or pays a mapping read from flash. Watch the mapping step light up on a miss — that stall is often longer than the read itself.',
+      'A logical page address means nothing to NAND. The flash translation layer maps it to a physical page across channels, chips, dies and planes. The host side still runs one of six fixed single-table statement kinds, and that kind selects a fixed plan template before any card is drawn: no joins, and no cost-driven choice. This city does not model wear-aware placement policies: a direct-mapped CMT lookup either hits or pays a mapping read from flash. Watch the mapping step light up on a miss — that stall is often longer than the read itself.',
     focus: 'planner.planner',
     duration: 16,
   },
@@ -155,7 +155,7 @@ const STEPS: TourStep[] = [
     id: 'checkpoint',
     title: 'Garbage collection begins',
     body:
-      'Flash cannot overwrite in place. Every program must target an erased page, so the FTL watches the free-page pool; when it crosses the GC threshold, it picks the block with the fewest valid pages, copies them out, and erases. Watch the violet GC machinery wake, and the erase latency — hundreds of stretched model milliseconds — stall everything sharing that die.',
+      'Flash cannot overwrite in place. Every program must target an erased page, so the FTL watches the free-page pool; when it crosses the GC threshold, it picks the block with the fewest valid pages, copies them out, and erases. Watch the violet GC machinery wake, and the erase latency — hundreds of stretched model milliseconds — stall everything sharing that die. Open the Latency vital to compare modeled p50 and p99 while GC runs; those quantiles are model ms, not production milliseconds.',
     focus: 'checkpointer',
     duration: 22,
     scenario: 'checkpoint-storm',
@@ -183,7 +183,7 @@ const STEPS: TourStep[] = [
     id: 'horizon',
     title: 'When the write cache turns hostile',
     body:
-      'A deep-queue writer fills the DRAM cache faster than the destage path drains it. Evictions then fire with dirty lines still pending, doubling flash traffic — and the low-intensity flow sharing the cache slows down with it. This is the write-cache contention result from FAST 2018 §6.1.2: the aggressive flow hurts itself and everyone else.',
+      'A deep-queue writer fills the DRAM cache faster than the destage path drains it. Evictions then fire with dirty lines still pending, doubling flash traffic — and the low-intensity flow sharing the cache slows down with it. This is the write-cache contention result from FAST 2018 §6.1.2: the aggressive flow hurts itself and everyone else. Think of the dirty pool like a version horizon: a cached line is a snapshot of a pending write, and destaging is its removal horizon — until the line lands in flash, every eviction must preserve it.',
     focus: 'xmin.horizon',
     duration: 22,
     knobs: { dataCacheMiB: 32, iops: 6000 },
