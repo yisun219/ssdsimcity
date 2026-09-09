@@ -2,6 +2,7 @@ import '../styles/tour.css'
 
 import type { Knobs, QueryKind, TracePlayback, TraceStop, TourChapter } from '../core/types'
 import { CLAIM_VALUES } from '../core/claims'
+import { t, currentLang } from '../core/i18n'
 import { createCorrectionPath, displayedClaim } from '../core/corrections'
 import { mdToHtml } from './content'
 import { clamp, reduceMotion } from '../core/util'
@@ -1087,10 +1088,10 @@ export function createTour(ctx: UiContext, options: TourOptions = {}): UiModule 
     const step = STEPS[index]
     setText(numEl, String(index + 1))
     setText(ofEl, `of ${STEPS.length}`)
-    setText(titleEl, step.title)
+    setText(titleEl, t(`tour.${step.id}`) === `tour.${step.id}` ? step.title : t(`tour.${step.id}`))
     const bodyHtml = mdToHtml(step.body)
     if (bodyEl.innerHTML !== bodyHtml) bodyEl.innerHTML = bodyHtml
-    setText(eyebrow, step.scenario ? 'Guided tour · scenario running' : 'Guided tour')
+    setText(eyebrow, step.scenario ? `${t('tour.eyebrow')} · ${currentLang() === 'zh' ? '场景运行中' : 'scenario running'}` : t('tour.eyebrow'))
     prevBtn.disabled = index === 0
     const finishing = index === STEPS.length - 1
     setText(nextLabel, finishing ? 'Finish' : 'Next')
@@ -1184,9 +1185,17 @@ export function createTour(ctx: UiContext, options: TourOptions = {}): UiModule 
    * TICK
    * =====================================================================*/
 
+  let paintedLang = currentLang()
+
   function update(dt: number, wallDt = dt): void {
     updateTrace(dt, wallDt)
     if (!running) return
+
+    // A language switch mid-tour relabels the current card without restarting it.
+    if (currentLang() !== paintedLang) {
+      paintedLang = currentLang()
+      paintChapter()
+    }
 
     const step = STEPS[index]
     stageElapsed = Math.min(step.duration, stageElapsed + wallDt)

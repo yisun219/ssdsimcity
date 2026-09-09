@@ -1,6 +1,7 @@
 import '../styles/hud.css'
 
 import { DESTINATIONS, destinationForDistrict } from '../core/destinations'
+import { t, currentLang, setLang } from '../core/i18n'
 import { CLAIM_VALUES } from '../core/claims'
 import { createCorrectionPath, displayedClaim } from '../core/corrections'
 import { COLOR, cssColor, onThemeMode, themeMode, toggleThemeMode } from '../core/theme'
@@ -397,6 +398,7 @@ export function createHud(ctx: UiContext, options: { onInvestigate?: () => void 
     value: HTMLElement
     canvas: HTMLCanvasElement
     state: State
+    labelEl: HTMLElement
   }
 
   const vitalAction = (def: VitalDef): string => def.key === 'latency'
@@ -406,6 +408,7 @@ export function createHud(ctx: UiContext, options: { onInvestigate?: () => void 
   const vitals: VitalUi[] = VITALS.map((def) => {
     const value = el('div', { class: 'pg-metric__v hud-vital__v', text: '—' })
     const canvas = el('canvas', { class: 'pg-spark hud-vital__spark', width: 88, height: 24 })
+    const labelEl = el('div', { class: 'pg-metric__k hud-vital__k', text: def.label })
     const root = el(
       'button',
       {
@@ -428,11 +431,11 @@ export function createHud(ctx: UiContext, options: { onInvestigate?: () => void 
           },
         },
       },
-      el('div', { class: 'pg-metric__k hud-vital__k', text: def.label }),
+      labelEl,
       value,
       canvas,
     )
-    return { def, root, value, canvas, state: '' }
+    return { def, root, value, canvas, state: '', labelEl }
   })
 
   const vitalsRow = el('div', { class: 'hud-vitals' }, ...vitals.map((v) => v.root))
@@ -673,10 +676,23 @@ export function createHud(ctx: UiContext, options: { onInvestigate?: () => void 
      the instrument bar; on a phone there is no room for both, and the split
      that survives is instruments on top, controls at the bottom — so this whole
      cluster moves into the transport dock and comes back on rotation. */
+  const langLabel = el('span', { class: 'hud-lang__label', text: t('ui.lang') })
+  const langBtn = el(
+    'button',
+    {
+      class: 'pg-btn hud-tool hud-lang',
+      type: 'button',
+      title: t('ui.lang.aria'),
+      'aria-label': t('ui.lang.aria'),
+      on: { click: () => toggleLang() },
+    },
+    langLabel,
+  )
   const toolCluster = el(
     'div',
     { class: 'hud-tools', data: { analyticsPanel: 'hud' } },
     audioBtn,
+    langBtn,
     themeBtn,
     sourceLink,
     topEl.children[0],
@@ -1022,9 +1038,11 @@ export function createHud(ctx: UiContext, options: { onInvestigate?: () => void 
   interface ChipUi {
     id: string
     root: HTMLButtonElement
+    nameEl: HTMLElement
   }
 
   const chips: ChipUi[] = SCENARIOS.map((s) => {
+    const nameEl = el('span', { class: 'hud-chip__name', text: t(`scenario.${s.id}`) })
     const root = el(
       'button',
       {
@@ -1036,9 +1054,9 @@ export function createHud(ctx: UiContext, options: { onInvestigate?: () => void 
         on: { click: () => toggleScenario(s.id) },
       },
       el('span', { class: 'hud-chip__icon', text: s.icon }),
-      el('span', { class: 'hud-chip__name', text: s.name }),
+      nameEl,
     )
-    return { id: s.id, root }
+    return { id: s.id, root, nameEl }
   })
 
   const chipRow = el('div', { class: 'hud-chips pg-scroll' }, ...chips.map((c) => c.root))
@@ -1591,6 +1609,33 @@ export function createHud(ctx: UiContext, options: { onInvestigate?: () => void 
       ms: 1800,
     })
   }
+
+  /** Flip the teaching language and relabel every live surface this module owns. */
+  function toggleLang(): void {
+    setLang(currentLang() === 'zh' ? 'en' : 'zh')
+    setText(langLabel, t('ui.lang'))
+    langBtn.setAttribute('aria-label', t('ui.lang.aria'))
+    langBtn.setAttribute('title', t('ui.lang.aria'))
+    relabelVitals()
+    bus.emit('toast', {
+      text: currentLang() === 'zh' ? '界面已切换到中文' : 'Interface switched to English',
+      kind: 'info',
+      ms: 1800,
+    })
+  }
+
+  /** Re-render the vital labels and hints from the live dictionary. */
+  function relabelVitals(): void {
+    for (let i = 0; i < vitals.length; i++) {
+      const key = vitals[i].def.key
+      setText(vitals[i].labelEl, t(`vital.${key}`))
+      vitals[i].root.setAttribute('title', t(`vital.${key}.hint`))
+    }
+    for (let i = 0; i < chips.length; i++) {
+      setText(chips[i].nameEl, t(`scenario.${chips[i].id}`))
+    }
+  }
+
 
   function toggleLabels(): void {
     labelsOn = !labelsOn

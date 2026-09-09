@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import './styles/tokens.css'
 import './styles/ui.css'
 
+import { initLang } from './core/i18n'
 import { startAnalytics, trackVacuumLessonProgress } from './core/analytics'
 import { installLessonRoutes } from './core/lesson-route'
 import { createBus } from './core/bus'
@@ -125,6 +126,7 @@ function fatal(message: string, detail?: unknown): void {
 }
 
 async function boot(): Promise<void> {
+  initLang()
   const canvasRoot = document.getElementById('canvas-root')
   const labelsRoot = document.getElementById('labels-root')
   if (!canvasRoot || !labelsRoot) throw new Error('DOM shell is missing')
