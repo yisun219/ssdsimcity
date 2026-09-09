@@ -3,22 +3,28 @@ export interface BootStep {
   label: string
 }
 
-export const BOOT_STEPS = {
-  renderer: { pct: 8, label: 'starting the renderer…' },
-  camera: { pct: 16, label: 'placing the camera…' },
-  simulation: { pct: 24, label: 'warming up the cluster…' },
-  ground: { pct: 32, label: 'grading the ground…' },
-  sharedMemory: { pct: 42, label: 'pouring the shared memory plaza…' },
-  backends: { pct: 52, label: 'forking backends…' },
-  wal: { pct: 62, label: 'laying the write-ahead log…' },
-  storage: { pct: 70, label: 'excavating the data directory…' },
-  maintenance: { pct: 78, label: 'opening the maintenance yard…' },
-  standby: { pct: 85, label: 'connecting the standby…' },
-  roads: { pct: 90, label: 'painting the roads…' },
-  console: { pct: 96, label: 'wiring the console…' },
-  firstFrame: { pct: 100, label: 'rendering the first frame…' },
-} as const satisfies Record<string, BootStep>
+function bootLabel(en: string, zh: string): string {
+  try {
+    const lang = (window.localStorage.getItem('ssdsimcity.lang') ?? 'en')
+    return lang === 'zh' ? zh : en
+  } catch { return en }
+}
 
+export const BOOT_STEPS = {
+  renderer: { pct: 8, label: bootLabel('starting the renderer…', '正在启动渲染器…') },
+  camera: { pct: 16, label: bootLabel('placing the camera…', '正在安放相机…') },
+  simulation: { pct: 24, label: bootLabel('warming up the cluster…', '正在预热设备…') },
+  ground: { pct: 32, label: bootLabel('grading the ground…', '正在平整地面…') },
+  sharedMemory: { pct: 42, label: bootLabel('pouring the shared memory plaza…', '正在浇筑缓存广场…') },
+  backends: { pct: 52, label: bootLabel('forking backends…', '正在架起流塔…') },
+  wal: { pct: 62, label: bootLabel('laying the write-ahead log…', '正在铺设写路径…') },
+  storage: { pct: 70, label: bootLabel('excavating the data directory…', '正在开挖 NAND 阵列…') },
+  maintenance: { pct: 78, label: bootLabel('opening the maintenance yard…', '正在打开 GC 场…') },
+  standby: { pct: 85, label: bootLabel('connecting the standby…', '正在连接公平性观测区…') },
+  roads: { pct: 90, label: bootLabel('painting the roads…', '正在绘制道路…') },
+  console: { pct: 96, label: bootLabel('wiring the console…', '正在接通控制台…') },
+  firstFrame: { pct: 100, label: bootLabel('rendering the first frame…', '正在渲染第一帧…') },
+} as const satisfies Record<string, BootStep>
 export type FrameScheduler = (callback: () => void) => void
 
 /**

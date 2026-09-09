@@ -13,6 +13,16 @@ table, and flash channels become bottlenecks. Modeled on MQSim (FAST 2018).
 
 No installation. Runs in a browser with WebGL2.
 
+---
+
+**中文说明（简体）**
+
+SSDSimCity 是一座可探索的 3D 城市:建筑即现代多队列 SSD 的内部机构,运动即其相互作用。跟随一条 I/O 请求,从主机提交队列出发,穿过 FTL 落入 NAND;追问为什么垃圾回收一开始写入就骤然变慢;观察写缓存、映射表与闪存通道如何成为瓶颈。设备模型基于 MQSim(FAST 2018)。
+
+- 顶栏的 **中文 / English** 按钮可随时切换教学界面语言(自动记住选择;首次访问跟随浏览器语言)。
+- 场景菜单:稳态运行、GC 风暴、缓存颠簸、写缓存封锁等,每个场景改变一件事,让你看后果如何在城市中传播。
+- 无需安装,浏览器支持 WebGL2 即可运行。
+
 [![SSDSimCity at golden hour: the DRAM data cache, flow towers and surrounding SSD districts. Click to explore the city.](docs/screenshot.png)](https://yisun219.github.io/ssdsimcity/)
 
 [Featured in InfoQ · IBM Think · Gizmodo · GIGAZINE](#press-coverage)
