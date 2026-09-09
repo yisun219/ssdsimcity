@@ -340,7 +340,9 @@ export const createStorage: WorldFactory = (ctx: WorldContext): WorldModule => {
       roughness: 0.98,
       metalness: 0,
       transparent: true,
-      opacity: 0.68,
+      // Thin enough that the PCB weave and copper traces read through in
+      // daylight too — the floor should never lose its die-floor identity.
+      opacity: 0.42,
       depthWrite: false,
       polygonOffset: true,
       polygonOffsetFactor: -1,
@@ -660,6 +662,24 @@ export const createStorage: WorldFactory = (ctx: WorldContext): WorldModule => {
     roofProxies.push(proxy)
 
     /* --- fixed architecture on the relation's slot ---------------------- */
+    // Die tag: a low stele at the die's north face carrying its table name,
+    // the way a packaged NAND die is laser-marked.
+    {
+      const tagTex = theme.textTexture(TABLES[ti].name.toUpperCase(), {
+        size: 96,
+        color: '#dfe9ff',
+      })
+      const tagImg = tagTex.image as { width: number; height: number }
+      const tagMat = keep(new THREE.MeshBasicMaterial({ map: tagTex, transparent: true, depthWrite: false, toneMapped: false }))
+      const tag = new THREE.Mesh(keep(new THREE.PlaneGeometry(1, 1)), tagMat)
+      const tagH = 2.4
+      tag.scale.set(tagH * Math.max(1, tagImg.width / tagImg.height), tagH, 1)
+      tag.position.set(tx, FLOOR_Y + 3.1, SLOT_Z0 - 2.6)
+      tag.rotation.y = Math.PI
+      tag.raycast = () => {}
+      markTextPlane(tag, `NAND die ${TABLES[ti].name}`)
+      g.add(tag)
+    }
     const sz0 = SLOT_Z0
     const sz1 = SLOT_Z1
 
@@ -2434,15 +2454,27 @@ function buildFloorTexture(rng: () => number, W: number): {
   const X = (wx: number) => (wx - FLOOR_X0) * px
   const Y = (wz: number) => (wz - FLOOR_Z0) * px
 
-  g.fillStyle = '#070c15'
+  // PCB substrate: near-black solder mask with a faint copper weave, not
+  // cast concrete — this floor is the inside of a drive.
+  g.fillStyle = '#0a1410'
   g.fillRect(0, 0, W, H)
-
-  // Cast-concrete mottling, 8 m module.
   for (let wx = FLOOR_X0; wx < FLOOR_X1; wx += 8) {
     for (let wz = FLOOR_Z0; wz < FLOOR_Z1; wz += 8) {
-      g.fillStyle = `rgba(120,160,220,${(0.003 + rng() * 0.01).toFixed(4)})`
+      g.fillStyle = `rgba(70,150,110,${(0.004 + rng() * 0.012).toFixed(4)})`
       g.fillRect(X(wx), Y(wz), 8 * px, 8 * px)
     }
+  }
+  // Copper trace whispers: short horizontal runs like inner-layer routing.
+  g.lineWidth = Math.max(1, 0.4 * px)
+  for (let i = 0; i < 220; i++) {
+    const tx = FLOOR_X0 + rng() * (FLOOR_X1 - FLOOR_X0)
+    const tz = FLOOR_Z0 + rng() * (FLOOR_Z1 - FLOOR_Z0)
+    const len = 6 + rng() * 26
+    g.strokeStyle = `rgba(184,140,72,${(0.05 + rng() * 0.09).toFixed(3)})`
+    g.beginPath()
+    g.moveTo(X(tx), Y(tz))
+    g.lineTo(X(Math.min(tx + len, FLOOR_X1)), Y(tz))
+    g.stroke()
   }
 
   // Survey grid: 4 m minor, 20 m major.
@@ -2460,6 +2492,48 @@ function buildFloorTexture(rng: () => number, W: number): {
   g.stroke()
   g.lineWidth = 2
   g.strokeStyle = 'rgba(70,104,160,0.34)'
+  g.beginPath()
+  for (let wx = FLOOR_X0; wx <= FLOOR_X1; wx += 20) {
+    g.moveTo(X(wx), 0)
+    g.lineTo(X(wx), H)
+  }
+  for (let wz = FLOOR_Z0; wz <= FLOOR_Z1; wz += 20) {
+    g.moveTo(0, Y(wz))
+    g.lineTo(W, Y(wz))
+  }
+  g.stroke()
+
+  // Wafer frame: a copper outline ringing the five die bays, with wafer
+  // alignment crosses at the corners — the saw lane and fiducials of a real
+  // wafer map, painted where the die floor begins.
+  {
+    const fx0 = X(-118)
+    const fx1 = X(118)
+    const fz0 = Y(-99)
+    const fz1 = Y(38)
+    g.strokeStyle = 'rgba(196,168,110,0.4)'
+    g.lineWidth = 3
+    g.strokeRect(fx0, fz0, fx1 - fx0, fz1 - fz0)
+    g.strokeStyle = 'rgba(196,168,110,0.3)'
+    g.lineWidth = 1.5
+    for (const [cx, cy] of [
+      [fx0 + 14, fz0 + 14],
+      [fx1 - 14, fz0 + 14],
+      [fx0 + 14, fz1 - 14],
+      [fx1 - 14, fz1 - 14],
+    ]) {
+      g.beginPath()
+      g.moveTo(cx - 8, cy)
+      g.lineTo(cx + 8, cy)
+      g.moveTo(cx, cy - 8)
+      g.lineTo(cx, cy + 8)
+      g.stroke()
+    }
+  }
+
+  // Grid recolour for the PCB read: keep the survey grid faint copper.
+  g.strokeStyle = 'rgba(120,150,190,0.18)'
+  g.lineWidth = 1
   g.beginPath()
   for (let wx = FLOOR_X0; wx <= FLOOR_X1; wx += 20) {
     g.moveTo(X(wx), 0)
@@ -2497,7 +2571,9 @@ function buildFloorTexture(rng: () => number, W: number): {
     labels.draw(text, wx, wz, size, color, align, rot, semanticCarrier)
   }
 
-  /* Relation slots: one painted bay per heap file. */
+  /* Relation slots: one painted die per heap file. The bay is drawn as a
+   * rounded die outline with contact pads along its south edge — the shape
+   * you see when you look at a bare NAND package. */
   for (let ti = 0; ti < N_TABLES; ti++) {
     const def = TABLES[ti]
     const tx = tableX(ti)
@@ -2508,12 +2584,29 @@ function buildFloorTexture(rng: () => number, W: number): {
     const y0 = Y(bz0)
     const h = (bz1 - bz0) * px
 
-    g.save()
-    g.setLineDash([14, 10])
-    g.lineWidth = 2.5
-    g.strokeStyle = hexA(def.color, 0.42)
-    g.strokeRect(x0, y0, w, h)
-    g.restore()
+    // Die substrate: a slightly lighter panel under the page grid.
+    g.fillStyle = hexA(def.color, 0.05)
+    g.fillRect(x0, y0, w, h)
+    // Rounded die outline, corner radius ~3 m.
+    const r = 3 * px
+    g.strokeStyle = hexA(def.color, 0.55)
+    g.lineWidth = 3
+    g.beginPath()
+    g.moveTo(x0 + r, y0)
+    g.arcTo(x0 + w, y0, x0 + w, y0 + h, r)
+    g.arcTo(x0 + w, y0 + h, x0, y0 + h, r)
+    g.arcTo(x0, y0 + h, x0, y0, r)
+    g.arcTo(x0, y0, x0 + w, y0, r)
+    g.closePath()
+    g.stroke()
+    // Contact pads along the south edge: the die's ball-out.
+    const pads = 10
+    const padW = 2.2 * px
+    g.fillStyle = 'rgba(196,168,110,0.5)'
+    for (let p = 0; p < pads; p++) {
+      const padX = x0 + ((p + 0.5) * w) / pads - padW / 2
+      g.fillRect(padX, y0 + h - 1.6 * px, padW, 1.6 * px)
+    }
 
     // Corner brackets — the bay reads as a surveyed plot.
     g.strokeStyle = hexA(def.color, 0.75)

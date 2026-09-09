@@ -112,7 +112,7 @@ const PATH_EASE = 0.18
 /* A raised three-quarter view keeps the client terminal in the foreground,
  * the backend row clear of the basin, and storage visible below the deck.
  * The complete Slonik silhouette belongs to the separate plan preset. */
-const HOME_POS = new THREE.Vector3(-250, 285, -365)
+const HOME_POS = new THREE.Vector3(-235, 275, -345)
 const HOME_PIVOT = new THREE.Vector3(-5, -6, -45)
 
 /**
