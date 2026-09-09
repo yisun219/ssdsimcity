@@ -359,46 +359,6 @@ export const createStorage: WorldFactory = (ctx: WorldContext): WorldModule => {
   floorZone.userData.pgDayOnly = true
   floorZone.userData.pgNoShadow = true
   floorZone.visible = false
-  /* The wafer itself: a huge dark-silicon disc under all five die bays, with
-   * flat-notch and ring outlines. This is what makes the floor read as a
-   * wafer instead of a parking lot. */
-  {
-    const waferR = 116
-    const wafer = new THREE.Mesh(
-      keep(new THREE.CircleGeometry(waferR, 96).rotateX(-Math.PI / 2)),
-      keep(new THREE.MeshStandardMaterial({
-        color: 0x1c2430,
-        roughness: 0.55,
-        metalness: 0.55,
-      })),
-    )
-    wafer.name = 'storage.wafer'
-    wafer.position.set(floorCx, FLOOR_Y + 0.012, -22)
-    wafer.raycast = () => {}
-    wafer.userData.pgNoShadow = true
-    dirGroup.add(wafer)
-
-    // Ring outlines at 40/80/116 — the wafer's process rings.
-    const ringMat = keep(new THREE.MeshBasicMaterial({ color: 0x39506e, transparent: true, opacity: 0.5, toneMapped: false }))
-    for (const rr of [40, 80]) {
-      const ring = new THREE.Mesh(
-        keep(new THREE.RingGeometry(rr - 0.4, rr + 0.4, 96).rotateX(-Math.PI / 2)),
-        ringMat,
-      )
-      ring.position.set(floorCx, FLOOR_Y + 0.016, -22)
-      ring.raycast = () => {}
-      dirGroup.add(ring)
-    }
-    // The flat notch every real wafer carries, here on the south edge.
-    const notch = new THREE.Mesh(
-      keep(new THREE.PlaneGeometry(14, 3).rotateX(-Math.PI / 2)),
-      keep(new THREE.MeshBasicMaterial({ color: 0x39506e, transparent: true, opacity: 0.6, toneMapped: false })),
-    )
-    notch.position.set(floorCx, FLOOR_Y + 0.017, -22 + waferR - 1.2)
-    notch.raycast = () => {}
-    dirGroup.add(notch)
-  }
-
   dirGroup.add(floorZone)
 
   const mFloorLabels = keep(new THREE.MeshBasicMaterial({
@@ -413,7 +373,7 @@ export const createStorage: WorldFactory = (ctx: WorldContext): WorldModule => {
   mFloorLabels.name = 'storage.planLabels'
   const floorLabels = new THREE.Mesh(gFloor, mFloorLabels)
   floorLabels.name = 'storage.planLabels'
-  floorLabels.position.set(floorCx, FLOOR_Y + 0.075, floorCz)
+  floorLabels.position.set(floorCx, FLOOR_Y + 0.12, floorCz)
   floorLabels.renderOrder = 2
   floorLabels.raycast = () => {}
   markTextTexture(floorLabelTex, 'DATA DIRECTORY floor plan')
@@ -2586,32 +2546,49 @@ function buildFloorTexture(rng: () => number, W: number): {
   }
   g.stroke()
 
-  // Wafer frame: a copper outline ringing the five die bays, with wafer
-  // alignment crosses at the corners — the saw lane and fiducials of a real
-  // wafer map, painted where the die floor begins.
+  // The wafer itself, painted: a full circular disc with process rings, a
+  // flat notch, and corner fiducial crosses — the floor reads as one wafer
+  // carrying five die blocks. Painted, not extruded, so nothing fights the
+  // floor plane in depth.
   {
-    const fx0 = X(-118)
-    const fx1 = X(118)
-    const fz0 = Y(-99)
-    const fz1 = Y(38)
-    g.strokeStyle = 'rgba(196,168,110,0.4)'
+    const cx = X(0)
+    const cy = Y(-22)
+    g.save()
+    g.beginPath()
+    g.arc(cx, cy, 108 * px, 0, Math.PI * 2)
+    g.fillStyle = 'rgba(30,42,58,0.55)'
+    g.fill()
+    g.strokeStyle = 'rgba(196,168,110,0.5)'
     g.lineWidth = 3
-    g.strokeRect(fx0, fz0, fx1 - fx0, fz1 - fz0)
-    g.strokeStyle = 'rgba(196,168,110,0.3)'
-    g.lineWidth = 1.5
-    for (const [cx, cy] of [
-      [fx0 + 14, fz0 + 14],
-      [fx1 - 14, fz0 + 14],
-      [fx0 + 14, fz1 - 14],
-      [fx1 - 14, fz1 - 14],
-    ]) {
+    g.stroke()
+    for (const rr of [40, 76]) {
       g.beginPath()
-      g.moveTo(cx - 8, cy)
-      g.lineTo(cx + 8, cy)
-      g.moveTo(cx, cy - 8)
-      g.lineTo(cx, cy + 8)
+      g.arc(cx, cy, rr * px, 0, Math.PI * 2)
+      g.strokeStyle = 'rgba(120,160,210,0.32)'
+      g.lineWidth = 2
       g.stroke()
     }
+    // Flat notch on the south edge.
+    g.beginPath()
+    g.moveTo(cx - 8 * px, cy + 108 * px)
+    g.lineTo(cx + 8 * px, cy + 108 * px)
+    g.strokeStyle = 'rgba(196,168,110,0.65)'
+    g.lineWidth = 5
+    g.stroke()
+    // Fiducial crosses at the wafer's cardinal points.
+    g.lineWidth = 1.5
+    g.strokeStyle = 'rgba(196,168,110,0.4)'
+    for (const [ax, ay] of [[0, -22 - 100], [0, -22 + 100], [-100, -22], [100, -22]]) {
+      const px2 = X(ax)
+      const py2 = Y(ay)
+      g.beginPath()
+      g.moveTo(px2 - 8, py2)
+      g.lineTo(px2 + 8, py2)
+      g.moveTo(px2, py2 - 8)
+      g.lineTo(px2, py2 + 8)
+      g.stroke()
+    }
+    g.restore()
   }
 
   // Grid recolour for the PCB read: keep the survey grid faint copper.
