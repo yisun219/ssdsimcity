@@ -283,12 +283,28 @@ export function createSilhouetteDetails(ctx: WorldContext): WorldModule {
   let bakeAttempted = false
   let bakeInstalled = false
 
+  let installRetries = 0
+  let installScheduled = false
+
   function installBake(): void {
-    if (bakeAttempted) return
-    bakeAttempted = true
-    const stats = installBakedIndirect(ctx.scene)
-    ctx.scene.userData.pgBakedLight = stats
-    bakeInstalled = stats.installed
+    if (bakeAttempted || installScheduled) return
+    installScheduled = true
+    const attempt = (): void => {
+      installScheduled = false
+      if (bakeAttempted) return
+      const stats = installBakedIndirect(ctx.scene)
+      if (!stats.installed && installRetries < 12) {
+        // The first frames still settle the scene — boot-time meshes come and
+        // go, so a signature-count miss is worth a retry before giving up.
+        installRetries++
+        setTimeout(attempt, 250)
+        return
+      }
+      bakeAttempted = true
+      ctx.scene.userData.pgBakedLight = stats
+      bakeInstalled = stats.installed
+    }
+    setTimeout(attempt, 250)
   }
 
   return {

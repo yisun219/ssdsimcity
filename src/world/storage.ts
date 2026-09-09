@@ -359,6 +359,46 @@ export const createStorage: WorldFactory = (ctx: WorldContext): WorldModule => {
   floorZone.userData.pgDayOnly = true
   floorZone.userData.pgNoShadow = true
   floorZone.visible = false
+  /* The wafer itself: a huge dark-silicon disc under all five die bays, with
+   * flat-notch and ring outlines. This is what makes the floor read as a
+   * wafer instead of a parking lot. */
+  {
+    const waferR = 116
+    const wafer = new THREE.Mesh(
+      keep(new THREE.CircleGeometry(waferR, 96).rotateX(-Math.PI / 2)),
+      keep(new THREE.MeshStandardMaterial({
+        color: 0x1c2430,
+        roughness: 0.55,
+        metalness: 0.55,
+      })),
+    )
+    wafer.name = 'storage.wafer'
+    wafer.position.set(floorCx, FLOOR_Y + 0.012, -22)
+    wafer.raycast = () => {}
+    wafer.userData.pgNoShadow = true
+    dirGroup.add(wafer)
+
+    // Ring outlines at 40/80/116 — the wafer's process rings.
+    const ringMat = keep(new THREE.MeshBasicMaterial({ color: 0x39506e, transparent: true, opacity: 0.5, toneMapped: false }))
+    for (const rr of [40, 80]) {
+      const ring = new THREE.Mesh(
+        keep(new THREE.RingGeometry(rr - 0.4, rr + 0.4, 96).rotateX(-Math.PI / 2)),
+        ringMat,
+      )
+      ring.position.set(floorCx, FLOOR_Y + 0.016, -22)
+      ring.raycast = () => {}
+      dirGroup.add(ring)
+    }
+    // The flat notch every real wafer carries, here on the south edge.
+    const notch = new THREE.Mesh(
+      keep(new THREE.PlaneGeometry(14, 3).rotateX(-Math.PI / 2)),
+      keep(new THREE.MeshBasicMaterial({ color: 0x39506e, transparent: true, opacity: 0.6, toneMapped: false })),
+    )
+    notch.position.set(floorCx, FLOOR_Y + 0.017, -22 + waferR - 1.2)
+    notch.raycast = () => {}
+    dirGroup.add(notch)
+  }
+
   dirGroup.add(floorZone)
 
   const mFloorLabels = keep(new THREE.MeshBasicMaterial({
@@ -652,7 +692,15 @@ export const createStorage: WorldFactory = (ctx: WorldContext): WorldModule => {
     g.add(body)
     bodyMeshes.push(body)
     writeBoxEdges(edgePos, ti, tx, FLOOR_Y + bodyH / 2, cz0, HALF_W, bodyH / 2, len0 / 2)
-
+    // The die plinth: a low silicon slab the pages sit on — reads as a bare
+    // NAND die, not a warehouse. Added after the shell so `children[0]` stays
+    // the length-following body the anatomy code expects.
+    const dieSlab = new THREE.Mesh(gUnit, mStructHi)
+    dieSlab.position.set(tx, FLOOR_Y + 0.19, cz0)
+    // 0.38 tall: a walk-over kerb, below the 0.45 step height.
+    dieSlab.scale.set(HALF_W * 2 + 4.5, 0.38, len0 + 6)
+    dieSlab.name = 'die.slab'
+    g.add(dieSlab)
     // Roof collider: the tiles live in a shared mesh, so give the picker a box.
     const proxy = new THREE.Mesh(gUnit, mPick)
     proxy.position.set(tx, ROOF_Y + 1.2, cz0)
@@ -1106,6 +1154,41 @@ export const createStorage: WorldFactory = (ctx: WorldContext): WorldModule => {
       markTextPlane(label, 'MEMORY ENDS  /  DISK BEGINS')
       durabilityGroup.add(label)
     }
+  }
+
+  /* The controller die: the one big chip every real SSD has besides its NAND.
+   * It sits north of the five NAND dies, at the head of the drive rack. */
+  {
+    const ctlGroup = new THREE.Group()
+    ctlGroup.name = 'storage.controller-die'
+    const ctlW = 44
+    const ctlD = 20
+    const ctl = new THREE.Mesh(gUnit, mStructHi)
+    ctl.position.set(0, FLOOR_Y + 1.05, -103)
+    ctl.scale.set(ctlW, 2.1, ctlD)
+    ctl.name = 'controller.die'
+    ctlGroup.add(ctl)
+    const ctlTop = new THREE.Mesh(
+      keep(new THREE.PlaneGeometry(ctlW - 1.4, ctlD - 1.6).rotateX(-Math.PI / 2)),
+      keep(new THREE.MeshStandardMaterial({ color: 0x2b3852, roughness: 0.42, metalness: 0.62 })),
+    )
+    ctlTop.position.set(0, FLOOR_Y + 2.13, -102.5)
+    ctlTop.raycast = () => {}
+    ctlGroup.add(ctlTop)
+    const ctlTex = theme.textTexture('CONTROLLER', { size: 96, color: '#e8b25f' })
+    const ctlImg = ctlTex.image as { width: number; height: number }
+    const ctlLabel = new THREE.Mesh(
+      keep(new THREE.PlaneGeometry(1, 1)),
+      keep(new THREE.MeshBasicMaterial({ map: ctlTex, transparent: true, depthWrite: false, toneMapped: false })),
+    )
+    const ctlH = 1.6
+    ctlLabel.scale.set(ctlH * Math.max(1, ctlImg.width / ctlImg.height), ctlH, 1)
+    ctlLabel.position.set(0, FLOOR_Y + 3.4, -90.6)
+    ctlLabel.rotation.y = Math.PI
+    ctlLabel.raycast = () => {}
+    markTextPlane(ctlLabel, 'controller die')
+    ctlGroup.add(ctlLabel)
+    dirGroup.add(ctlGroup)
   }
 
   /* ==================================================== 6. DISK ARRAY */
