@@ -1310,6 +1310,10 @@ export const createStorage: WorldFactory = (ctx: WorldContext): WorldModule => {
 
   let osHitRatio = 0.5
   let osResidentPct = 0
+  /* Die-LED device bindings: the erase highlight slot + its heat, and whether
+   * the device is inside an erase phase this tick (read from sim.ssd.gc). */
+  let eraseSlot = -1
+  let eraseHeat = 0
   let ledBudget = 0
   let fsyncGlow = 0
   let toastChunks = 0
@@ -2253,26 +2257,83 @@ export const createStorage: WorldFactory = (ctx: WorldContext): WorldModule => {
     osResidentPct = live ? resident / live : 0
     osTiles.instanceColor!.needsUpdate = true
 
-    /* --------------------------------------------------------- disk LEDs */
-    // Read LEDs consume the same disk-miss count that selected the full route;
-    // OS-cache hits never light media. Writes light here only as fsync drains.
-    ledBudget += diskReads
-    if (syncing) ledBudget += dt * 90
-    let guard = 0
-    while (ledBudget >= 1 && guard++ < 24) {
-      ledBudget -= 1
-      const i = (rnd() * N_DRIVES) | 0
-      ledHeat[i] = 1
-      ledKind[i] = syncing || rnd() < 0.4 ? 1 : 0
+    /* --------------------------------------------------------- die LEDs */
+    // Each LED is one sampled die-plane. The device's own block state drives
+    // it: stale-page share is the base heat, an active erase lights the die
+    // hot, and a GC candidate block pulses the warning colour. Host-side
+    // read/write events still add sparkle on top — media traffic exists — but
+    // the steady-state wear picture comes from the FTL, not from coin flips.
+    const blocks = sim.ssd.blocks
+    if (blocks.length > 0) {
+      // Aggregate the 4K sampled blocks down to N_DRIVES die slots.
+      const perSlot = new Float32Array(N_DRIVES) // stale share
+      const slotWear = new Float32Array(N_DRIVES)
+      const slotGc = new Uint8Array(N_DRIVES)
+      const counts = new Uint32Array(N_DRIVES)
+      let eraseHot = 0
+      let eraseKind = 0
+      for (let bi = 0; bi < blocks.length; bi++) {
+        const blk = blocks[bi]
+        // LED slot: channel-major, then chip/die/plane collapsed onto rows.
+        const slot = ((blk.channel * 3 + blk.chip) * 2 + blk.die) % N_DRIVES
+        perSlot[slot] += blk.invalid / Math.max(1, blk.valid + blk.invalid)
+        slotWear[slot] += Math.min(1, blk.eraseCount / 640)
+        if (blk.gcCandidate) slotGc[slot] = 1
+        counts[slot]++
+        const gcErase = sim.ssd.gc.phase === 'erase'
+        if (gcErase && blk.channel === sim.ssd.gc.victimChannel
+          && blk.chip === sim.ssd.gc.victimChip && blk.die === sim.ssd.gc.victimDie
+          && blk.plane === sim.ssd.gc.victimPlane) {
+          eraseSlot = slot
+          eraseHeat = 1
+          eraseKind = 1
+        }
+      }
+      const ledDec = Math.exp(-7 * dt)
+      for (let i = 0; i < N_DRIVES; i++) {
+        const n = Math.max(1, counts[i])
+        const stale = perSlot[i] / n
+        const wear = slotWear[i] / n
+        const h = (ledHeat[i] = Math.max(ledHeat[i] * ledDec, 0.12 + stale * 0.55 + wear * 0.3))
+        const k = 0.1 + h * 1.9
+        if (slotGc[i]) {
+          // reclaim target: the warning colour, pulsing with GC progress
+          const pulse = 0.55 + 0.45 * Math.sin(t * 6 + i)
+          setColor3(driveCol, i, L_CRIT[0] * k * pulse, L_CRIT[1] * k * pulse * 0.5, L_CRIT[2] * k * pulse * 0.6)
+        } else if (i === eraseSlot && eraseHeat > 0) {
+          const k2 = 0.1 + eraseHeat * 2.2
+          setColor3(driveCol, i, L_DIRTY[0] * k2, L_DIRTY[1] * k2 * 0.7, L_DIRTY[2] * k2 * 0.7)
+        } else {
+          // wear→amber tilt over the base storage teal
+          setColor3(driveCol, i,
+            L_STORAGE[0] * k * 0.8 + wear * 0.22,
+            L_STORAGE[1] * k * (1 - wear * 0.35),
+            L_STORAGE[2] * k * 0.9)
+        }
+      }
+      eraseHeat *= ledDec
+      if (eraseHeat < 0.02) eraseSlot = -1
+      drives.instanceColor!.needsUpdate = true
+    } else {
+      // No device state (should not happen once the engine exists): legacy path.
+      ledBudget += diskReads
+      if (syncing) ledBudget += dt * 90
+      let guard = 0
+      while (ledBudget >= 1 && guard++ < 24) {
+        ledBudget -= 1
+        const i = (rnd() * N_DRIVES) | 0
+        ledHeat[i] = 1
+        ledKind[i] = syncing || rnd() < 0.4 ? 1 : 0
+      }
+      const ledDec = Math.exp(-7 * dt)
+      for (let i = 0; i < N_DRIVES; i++) {
+        const h = (ledHeat[i] *= ledDec)
+        const k = 0.1 + h * 1.9
+        if (ledKind[i]) setColor3(driveCol, i, L_DIRTY[0] * k, L_DIRTY[1] * k * 0.7, L_DIRTY[2] * k * 0.7)
+        else setColor3(driveCol, i, L_STORAGE[0] * k * 0.8, L_STORAGE[1] * k, L_STORAGE[2] * k * 0.9)
+      }
+      drives.instanceColor!.needsUpdate = true
     }
-    const ledDec = Math.exp(-7 * dt)
-    for (let i = 0; i < N_DRIVES; i++) {
-      const h = (ledHeat[i] *= ledDec)
-      const k = 0.1 + h * 1.9
-      if (ledKind[i]) setColor3(driveCol, i, L_DIRTY[0] * k, L_DIRTY[1] * k * 0.7, L_DIRTY[2] * k * 0.7)
-      else setColor3(driveCol, i, L_STORAGE[0] * k * 0.8, L_STORAGE[1] * k, L_STORAGE[2] * k * 0.9)
-    }
-    drives.instanceColor!.needsUpdate = true
 
     const fg = fsyncGlow * (0.7 + 0.3 * Math.sin(t * 14))
     mFsync.color.setRGB(0.08 + fg * 1.9, 0.03 + fg * 0.55, 0.06 + fg * 1.2)

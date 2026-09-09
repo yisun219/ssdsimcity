@@ -79,7 +79,7 @@ export function createVacuumLesson(ctx: UiContext, options: VacuumLessonOptions 
     decisionReady: false, reclaimed: 0, recovered: false,
   }
 
-  const title = el('h2', { id: 'vacuum-lesson-title', tabindex: '-1', text: 'Autovacuum is running. Why is this table still growing?' })
+  const title = el('h2', { id: 'vacuum-lesson-title', tabindex: '-1', text: 'The device is busy. Why is the write cache still thrashing?' })
   const modeLabel = el('span', { class: 'vacuum-lesson__mode' })
   const clock = el('span', { class: 'vacuum-lesson__clock' })
   const phaseLabel = el('p', { class: 'vacuum-lesson__step' })
@@ -120,13 +120,13 @@ export function createVacuumLesson(ctx: UiContext, options: VacuumLessonOptions 
 
   const causeFeedback = el('p', { class: 'vacuum-lesson__feedback' })
   const causes = el('section', { class: 'vacuum-lesson__causes' },
-    el('h3', { text: 'What is preventing cleanup?' }),
+    el('h3', { text: 'What is preventing the cache from recovering?' }),
   )
   const causeButtons = new Map<VacuumCause, HTMLButtonElement>()
   for (const [cause, text] of [
-    ['disabled', 'Autovacuum is switched off'],
-    ['snapshot', 'An older snapshot still needs the row versions'],
-    ['capacity', 'The table only needs more disk capacity'],
+    ['disabled', 'Destage is switched off'],
+    ['snapshot', 'A stale CMT mapping still pins the cache lines'],
+    ['capacity', 'The device only needs more overprovisioning'],
   ] as const) {
     const button = el('button', {
       type: 'button', class: 'pg-btn vacuum-lesson__answer', text,
@@ -138,21 +138,21 @@ export function createVacuumLesson(ctx: UiContext, options: VacuumLessonOptions 
   }
   causes.append(causeFeedback)
 
-  const terminateButton = actionButton('terminate', 'End the abandoned session')
-  const waitButton = actionButton('wait', 'Keep the transaction open')
+  const terminateButton = actionButton('terminate', 'Drain the deep-queue writer')
+  const waitButton = actionButton('wait', 'Keep the flow running')
   const decisionStatus = el('p', { class: 'vacuum-lesson__source' })
   const decision = el('section', { class: 'vacuum-lesson__decision' },
     el('h3', { text: 'Choose an intervention' }),
-    el('p', { text: 'The owner confirmed this session is abandoned. Ending it aborts its transaction; this scenario has no uncommitted row changes to preserve.' }),
+    el('p', { text: 'The owner confirmed this flow is abandoned mid-write. Draining its submission queue frees the DRAM cache; the scenario has no host data worth preserving to hold it open.' }),
     terminateButton, waitButton, decisionStatus,
   )
   const result = el('p', { class: 'vacuum-lesson__result', data: { vacuumResult: '' } })
   const recoverButton = el('button', {
-    type: 'button', class: 'pg-btn vacuum-lesson__primary', text: 'End the abandoned session now',
+    type: 'button', class: 'pg-btn vacuum-lesson__primary', text: 'Drain the deep-queue writer now',
     data: { vacuumRecover: '' }, on: { click: () => {
       if (state.phase !== 'observing' || !state.evidence.owner || !ctx.sim.recoverScenario()) return
       stopSeeking()
-      announce('The abandoned transaction has ended. Now verify that cleanup actually resumes.')
+      announce('The deep-queue writer has drained. Now verify that the cache actually recovers.')
       focus(TABLE)
       refresh()
     } },

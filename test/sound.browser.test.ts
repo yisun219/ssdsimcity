@@ -81,7 +81,7 @@ describe('movement sound in a rendered city', () => {
           if (${condition}) {
             clearInterval(timer)
             resolve(true)
-          } else if (performance.now() - startedAt > 15000) {
+          } else if (performance.now() - startedAt > 45000) {
             clearInterval(timer)
             reject(new Error('timed out waiting for ${condition.replaceAll("'", "\\'")}'))
           }

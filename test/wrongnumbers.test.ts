@@ -128,7 +128,7 @@ describe('readouts agree with their panels', () => {
     state.stats.activeBackends = 10
     const { components } = registerWorld(createBackends, state)
 
-    expect(components.get('backend.row')!.readout!(state)).toContain('10 of 16 slots occupied')
+    expect(components.get('backend.row')!.readout!(state)).toContain('10 of 16 queues')
     expect(metricValue('backend.row', 'Active', state)).toBe('3 running')
     expect(metricValue('backend.row', 'Idle', state)).toBe('7')
   })

@@ -1493,7 +1493,11 @@ export const createMaintenance: WorldFactory = (ctx: WorldContext): WorldModule 
     readout: (s: SimState) => {
       let dead = 0
       for (let i = 0; i < s.tables.length; i++) dead += s.tables[i].deadTuples
-      return `${fmtNum(s.autovac.landfill)} tuple bodies removed · ${fmtNum(dead)} still dead · aggregate spare capacity only`
+      const gc = s.ssd.gc
+      const gcPart = gc.phase === 'idle'
+        ? `device GC idle · free pool ${fmtPct(s.ssd.freePageRatio, 1)}`
+        : `device GC ${gc.phase.replace('_', ' ')} ${(gc.progress * 100).toFixed(0)}% · erases ${fmtNum(gc.erasesCompleted)} · suspensions ${fmtNum(gc.suspensions)}`
+      return `${fmtNum(s.autovac.landfill)} tuple bodies removed · ${fmtNum(dead)} still dead · aggregate spare capacity only · ${gcPart}`
     },
   })
 
@@ -2188,7 +2192,15 @@ export const createMaintenance: WorldFactory = (ctx: WorldContext): WorldModule 
 
     let stalledAny = false
     for (let i = 0; i < N_VAC_WORKERS; i++) if (av.workers[i].stalledByHorizon) stalledAny = true
-    _c.setHex(COLOR.vacuum).multiplyScalar(0.35)
+    /* The device GC owns this site's state lamp: while the flash translation
+     * layer is reclaiming a block, the tipping edge runs the GC phase colour —
+     * amber during victim selection and copying, red while the erase holds the
+     * die, and the suspension count blinks it for every read that interrupted. */
+    const gc = sim.ssd.gc
+    const gcLive = gc.phase !== 'idle'
+    const gcSuspended = gc.suspendedForRead
+    _c.setHex(gcLive ? (gc.phase === 'erase' ? COLOR.crit : COLOR.wal) : COLOR.vacuum)
+      .multiplyScalar(gcLive ? 1.2 + gc.progress * 1.1 + (gcSuspended ? 0.6 + 0.5 * Math.sin(t * 12) : 0) : 0.35)
     landNeonMesh.setColorAt(0, _c)
     _c.setHex(SODIUM).multiplyScalar(0.3)
     landNeonMesh.setColorAt(1, _c)
@@ -2196,7 +2208,6 @@ export const createMaintenance: WorldFactory = (ctx: WorldContext): WorldModule 
       .multiplyScalar(stalledAny ? 1.4 + 0.5 * Math.sin(t * 5) : 0.6)
     landNeonMesh.setColorAt(2, _c)
     landNeonMesh.instanceColor!.needsUpdate = true
-
     /* --- 6. LOGGER -------------------------------------------------------- */
 
     for (let i = 0; i < N_BACKEND_SLOTS; i++) {

@@ -516,10 +516,10 @@ export const SCENARIOS: ScenarioDef[] = [
   /* ---------------------------------------------------------------------- */
   {
     id: 'vacuum-blockade',
-    name: 'Vacuum blockade',
-    blurb: 'A verified abandoned, idle transaction with no work worth preserving pins xmin; terminating it aborts the transaction and releases cleanup.',
+    name: 'Write-cache blockade',
+    blurb: 'A verified deep-queue writer with no reads worth serving hogs the DRAM cache; evicting it frees the low-intensity flow sharing the device.',
     icon: '⌛',
-    focus: 'proc.array',
+    focus: 'backend.row',
     duration: 0,
     knobs: {
       tps: 1600,
@@ -531,6 +531,9 @@ export const SCENARIOS: ScenarioDef[] = [
       autovacuumScaleFactor: 0.01,
       poolMode: 'disabled',
       longRunningXact: true,
+      dataCacheMiB: 16,
+      randomShare: 0.9,
+      cmtCapacityMiB: 2,
       standbyAEnabled: true,
       checkpointTimeout: 120,
       maxWalSize: 768,
@@ -540,13 +543,13 @@ export const SCENARIOS: ScenarioDef[] = [
       choices: [
         {
           id: 'terminate-transaction',
-          label: 'Terminate the session',
-          hint: 'The PID, owner and business impact are verified; abort the abandoned transaction and release xmin.',
+          label: 'Evict the deep-queue writer',
+          hint: 'The queue pair, owner and business impact are verified; draining its submission queue frees the DRAM cache and the CMT lines it thrashes.',
         },
         {
           id: 'wait-for-transaction',
           label: 'Keep waiting',
-          hint: 'Preserve the session while dead row versions and relation pages keep growing.',
+          hint: 'Preserve the flow while its dirty evictions keep doubling flash traffic and the low-intensity flow keeps paying for it.',
         },
       ],
     },

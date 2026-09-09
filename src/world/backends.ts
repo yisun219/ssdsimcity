@@ -583,7 +583,14 @@ export const createBackends: WorldFactory = (ctx): WorldModule => {
     focus: { target: [0, 16, BZ], distance: 250, dir: [0.05, 0.5, 1] },
     labelAt: [0, 34, BZ],
     color: COLOR.backend,
-    readout: (s) => `${s.stats.activeBackends} of ${N} slots occupied · ${Math.round(s.stats.tps)} tps`,
+    readout: (s) => {
+      const f = s.ssd.flows
+      const active = f.filter((x) => x.active).length
+      const inSvc = f.reduce((n, x) => n + x.inFlight, 0)
+      const cap = s.knobs.queueFetchSize
+      const worst = f.reduce((m, x) => (x.active && x.latencyMs > m ? x.latencyMs : m), 0)
+      return `${s.stats.activeBackends} of ${N} queues · ${Math.round(s.stats.tps)} tps offered · device: ${active} active flows · ${inSvc}/${active * cap} in service (fetch cap ${cap}) · slowest ${Math.round(worst)} model ms`
+    },
   })
 
   for (let i = 0; i < N; i++) {
@@ -601,8 +608,12 @@ export const createBackends: WorldFactory = (ctx): WorldModule => {
       color: COLOR.backend,
       readout: (s) => {
         const b = s.backends[slot]
-        if (!b || !b.active) return `pid ${PID[slot]} · free slot`
-        return `pid ${PID[slot]} · ${b.state} · ${fmtDuration(b.stateT)} model phase · ${short(b.sql)}`
+        const f = s.ssd.flows[slot]
+        const flowPart = f && f.active
+          ? `SQ ${f.sqDepth} · in service ${f.inFlight} · ${f.reads}R/${f.writes}W · ${Math.round(f.latencyMs)} model ms`
+          : 'queue pair idle'
+        if (!b || !b.active) return `pid ${PID[slot]} · free slot · ${flowPart}`
+        return `pid ${PID[slot]} · ${b.state} · ${fmtDuration(b.stateT)} model phase · ${short(b.sql)} · ${flowPart}`
       },
     })
   }
@@ -650,11 +661,15 @@ export const createBackends: WorldFactory = (ctx): WorldModule => {
     prevT = t
 
     const nb = Math.min(N, sim.backends.length)
+    /* The device is the truth this district renders: each tower IS one NVMe
+     * submission queue. SQ depth drives the band, in-flight service drives the
+     * crown, and the request's pipeline stage drives the colour below. */
+    const nFlows = Math.min(N, sim.ssd.flows.length)
 
     for (let i = 0; i < N; i++) {
       const b = i < nb ? sim.backends[i] : null
       const st: BackendState = b ? b.state : 'free'
-
+      const flow = i < nFlows ? sim.ssd.flows[i] : null
       /* -- state → light ------------------------------------------------- */
       let bandHex = COLOR.bufClean
       let bandBr = 0
@@ -794,6 +809,43 @@ export const createBackends: WorldFactory = (ctx): WorldModule => {
           tintMix = 0.05
           tintDim = 0.85
           break
+      }
+
+      /* -- device flow → light -------------------------------------------- */
+      // The PG host state still tints the tower, but the DEVICE flow owns the
+      // final look: a deep submission queue brightens the band, entries in
+      // device service light the crown, and a CMT miss paints the mapping
+      // warning colour on top.
+      if (flow && flow.active) {
+        const fetchCap = Math.max(1, sim.knobs.queueFetchSize)
+        const sqFill = clamp01(flow.sqDepth / Math.max(1, fetchCap * 4))
+        const inSvc = clamp01(flow.inFlight / fetchCap)
+        // A queue with depth is a queue being drained: scroll faster, glow more.
+        scroll += sqFill * 30
+        bandBr = Math.max(bandBr, 0.35 + sqFill * 0.75)
+        crownBr = Math.max(crownBr, 0.3 + inSvc * 1.15)
+        // Latency pressure tips the band toward the warning colour.
+        if (flow.latencyMs > 2500) {
+          bandHex = COLOR.wal
+        }
+        const req = flow.lastRequest
+        if (req && req.state !== 'done') {
+          if (req.state === 'ftl_map') {
+            // translation work in flight: the mapping stage is visible
+            crownHex = COLOR.vacuum
+            crownBr = Math.max(crownBr, 0.9)
+          } else if (req.state === 'flash_read' || req.state === 'onfi_xfer') {
+            // media traffic: the die is talking
+            bandHex = COLOR.storage
+            bandBr = Math.max(bandBr, 0.8)
+          } else if (req.state === 'pcie_data') {
+            crownHex = COLOR.ok
+            crownBr = Math.max(crownBr, 1.0)
+          }
+        }
+      } else if (flow && !flow.active) {
+        // An idle queue pair: dim the crown so an offline tower reads as such.
+        crownBr = Math.min(crownBr, 0.08)
       }
 
       /* -- write the visual state ---------------------------------------- */

@@ -22,11 +22,12 @@ export function shmemDeckReadout(s: SimState): string {
 }
 
 export function sharedBuffersReadout(s: SimState): string {
+  const wc = s.ssd.writeCache
   return `hit ${fmtPct(s.buffers.hitRatio, 1)} · ${fmtNum(s.buffers.sampleFrames)}-frame sample · ${fmtBytes(
     poolBytes(s.knobs),
   )} pool · ${fmtNum(s.buffers.usedCount)}/${fmtNum(s.buffers.sampleFrames)} sample frames used · water level ${fmtPct(
     bufferPoolOccupancy(s.buffers),
-  )} sample occupancy`
+  )} sample occupancy · device cache ${fmtBytes(wc.usedBytes)}/${fmtBytes(wc.capacityBytes)} · dirty ${fmtBytes(wc.dirtyBytes)} · destage ${fmtBytes(wc.destageBytesPerSec)}/s`
 }
 
 export function procArrayReadout(s: SimState): string {
@@ -930,7 +931,12 @@ export const createShmem: WorldFactory = (ctx: WorldContext): WorldModule => {
   for (let i = 0; i < N; i++) tilePhase[i] = (rng() * 256) | 0
   let tilesPrimed = false
 
-  // Pin posts. A pinned frame is one somebody is holding open right now, and
+  /* Device write-cache overlay: which sample frames currently stand in for the
+   * DEVICE's dirty DRAM lines, and the ring cursor that claims them. Render
+   * state only — sim.buffers stays the host-pool truth it always was. */
+  const deviceTile = new Uint8Array(N)
+  let deviceClaims = 0
+  let deviceCursor = 0
   // the pin is precisely what stops the clock sweep taking it. Marking it with
   // its own amber post on the roof keeps "pinned" an INDEPENDENT reading from
   // "dirty": mixing amber into a blue or red tile only bleaches the tile and
@@ -1532,6 +1538,30 @@ export const createShmem: WorldFactory = (ctx: WorldContext): WorldModule => {
     const collapseStep = dt * 2.6
     const timeOff = (t * 200) | 0
 
+    /* Device write-cache overlay (render state only): fill rate decides how
+     * many sample frames wear the device-cache colour. Claims walk a ring so
+     * the band shifts smoothly instead of flickering frame to frame. */
+    {
+      const wc = sim.ssd.writeCache
+      const wanted = Math.round(size * clamp01(wc.dirtyBytes / Math.max(1, wc.capacityBytes)))
+      let guard = size
+      while (deviceClaims > wanted && guard-- > 0) {
+        deviceCursor = (deviceCursor + 1) % Math.max(1, size)
+        if (deviceTile[deviceCursor]) {
+          deviceTile[deviceCursor] = 0
+          deviceClaims--
+        }
+      }
+      guard = size
+      while (deviceClaims < wanted && guard-- > 0) {
+        deviceCursor = (deviceCursor + 1) % Math.max(1, size)
+        if (!deviceTile[deviceCursor] && valid[deviceCursor]) {
+          deviceTile[deviceCursor] = 1
+          deviceClaims++
+        }
+      }
+    }
+
     let nPins = 0
 
     for (let i = 0; i < n; i++) {
@@ -1587,6 +1617,17 @@ export const createShmem: WorldFactory = (ctx: WorldContext): WorldModule => {
             hb += (L_TABLE[o + 2] - hb) * w
           }
           target = 0.4 + (u / 5) * MAX_RISE
+          // The device's write-cache overlay: a frame claimed by the device
+          // cache glows amber-teal (the cache→flash destage debt), distinct
+          // from host dirt red and from the pin's amber post.
+          if (deviceTile[i]) {
+            const breathe = 0.12 * SIN[(tilePhase[i] + timeOff) & 255]
+            hr = L_DIRTY[0] * 0.4 + L_WAL[0] * 0.6 + breathe
+            hg = L_DIRTY[1] * 0.4 + L_WAL[1] * 0.6 + breathe
+            hb = L_DIRTY[2] * 0.4 + L_WAL[2] * 0.6
+            level = Math.max(level, 0.5)
+            target = Math.max(target, 0.52 + 0.02 * SIN[(tilePhase[i] * 3 + timeOff) & 255])
+          }
           if (pinned[i]) {
             // Held open right now: brighter, taller, and wearing a pin post.
             isPinned = true
