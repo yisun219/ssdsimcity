@@ -252,8 +252,8 @@ export const CLAIM_VALUES = {
   },
   vacuumReclaim: {
     plateLines: [
-      'space stays unless the tail is empty',
-      'ACCESS EXCLUSIVE · non-blocking · no lock, no shrink',
+      'invalid pages leave only when their block erases',
+      'no in-place update · erase-before-write · no lock',
     ],
     truncationLock: VACUUM_TRUNCATION_LOCK,
     rule: `Vacuum reuses space inside the table. It only shortens the file if the very last pages are entirely empty. To truncate that tail, vacuum briefly tries to acquire ${VACUUM_TRUNCATION_LOCK.mode} in a ${VACUUM_TRUNCATION_LOCK.attempt} lock attempt. ${VACUUM_TRUNCATION_LOCK.consequence}`,

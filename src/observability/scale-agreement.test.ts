@@ -126,8 +126,8 @@ describe('cross-surface scale agreement', () => {
     const settings = PROJECTIONS.settings(sim.state, collector, 'total')
 
     for (const value of [
-      metric('world.pit', 'Buffer pool', sim.state),
-      metric('shmem.deck', 'Buffer pool', sim.state),
+      metric('world.pit', 'Data cache frames', sim.state),
+      metric('shmem.deck', 'Data cache frames', sim.state),
       metric('shared.buffers', 'Pool size', sim.state),
       metric('os.cache', 'shared_buffers', sim.state),
       shmemDeckReadout(sim.state),

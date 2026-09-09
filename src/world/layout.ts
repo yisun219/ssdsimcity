@@ -22,7 +22,8 @@ export { rid } from '../core/route-ids'
  *              FLOW TOWERS  z = -130   x = -112 .. 112   (one SQ/CQ pair each)
  *   GC YARD            DEVICE DRAM CACHE             FLASH WRITE PATH
  *   x = -250..-110     x = -78..78  z = -62..62      x = 110..250
- *              NAND ARRAY (underground, y = -52)  x = -150..150  z = -110..110
+ *        NAND WAFER FLOOR (underground, y = -52): five plane rings,
+ *        centre [0, -20], radii 20..80 — one ring per modeled die
  *              MULTI-QUEUE FAIRNESS  z = +150 .. +340
  *                              ▼ +Z  (south)
  *
@@ -392,7 +393,16 @@ export function conduitX(i: number): number {
   return west ? -x : x
 }
 
-/** X position of table i in the storage underworld. */
+/* --- NAND floor: five die blocks ------------------------------------------ */
+
+/**
+ * The storage underworld reads as a NAND die array: one die block per modeled
+ * relation, its sampled pages tiled in rows across the die face, the drive
+ * rack along the floor's north edge. Die centres sit on the historical line
+ * `tableX`, so the heap/index/gantry architecture keeps its verified walking
+ * clearances; the die reading comes from the per-die shells, rails, and the
+ * wafer-frame labels painted around them.
+ */
 export function tableX(i: number): number {
   const xs = [-104, -52, 0, 52, 104]
   return xs[i % xs.length]
@@ -404,6 +414,8 @@ export function indexPos(i: number): [number, number, number] {
   return [tableX(i), CITY.storage.y, 26]
 }
 
+/** Z position of WAL segment slot i in the vault. */
+/** Z position of WAL segment slot i in the vault. */
 /** Z position of WAL segment slot i in the vault. */
 export function walSegZ(i: number): number {
   const step = 9
@@ -547,28 +559,30 @@ for (let i = 0; i < N_BACKEND_SLOTS; i++) {
 for (let t = 0; t < N_TABLES; t++) {
   const tx = tableX(t)
   const c = TABLES[t].color
+  // I/O lands on the table's own die face and climbs the same shaft as before.
+  const die = { x: tx, z: -60 }
 
-  // page fault: disk rack → OS cache → shared buffers
+  // page fault: die → OS cache → shared buffers
   route(rid.ioRead(t), [
-    [tx, CITY.storage.y + 6, -99],
+    [die.x, CITY.storage.y + 6, die.z],
     [tx * 0.85, CITY.osCache.y, -34],
     [tx * 0.45, -8, -6],
     [tx * 0.22, BUFFER_FLOW_Y, 22],
   ], { color: c, speed: 78, size: 1.2, visible: true, roadOpacity: 0.08 })
 
-  // kernel-cache hit: the short path never descends to the disk rack
+  // kernel-cache hit: the short path never descends to the wafer floor
   route(rid.ioReadCache(t), [
     [tx * 0.85, CITY.osCache.y, -34],
     [tx * 0.45, -8, -6],
     [tx * 0.22, BUFFER_FLOW_Y, 22],
   ], { color: COLOR.ok, speed: 92, size: 1.05, visible: true, roadOpacity: 0.05 })
 
-  // eviction / checkpoint write: shared buffers → kernel → disk rack
+  // eviction / checkpoint write: shared buffers → kernel → die ring
   route(rid.ioWrite(t), [
     [tx * 0.22 - 3, BUFFER_FLOW_Y, 26],
     [tx * 0.45 - 3, -8, -2],
     [tx * 0.85 - 3, CITY.osCache.y, -32],
-    [tx, CITY.storage.y + 6, -99],
+    [die.x - 2, CITY.storage.y + 6, die.z],
   ], { color: COLOR.bufDirty, speed: 78, size: 1.2 })
 
   // index probe: heap ← → index structure
@@ -724,22 +738,30 @@ route('replica.read', [
 route('ckpt.sweep', [
   [ANCHOR.checkpointer[0] + 10, 12, ANCHOR.checkpointer[2]],
   [-104, 12, -30],
-  [-74, 9, -16],
+  // The sweep walks the even bank row by row, west edge to east edge.
+  [-72, 9, -48],
+  [-40, 9, -34],
+  [-72, 9, -20],
+  [-40, 9, -6],
   [-46, 7, -6],
 ], { color: COLOR.checkpoint, speed: 95, size: 1.3, visible: true, roadOpacity: 0.16 })
 
 route('bgw.sweep', [
   [ANCHOR.bgWriter[0] + 10, 10, ANCHOR.bgWriter[2]],
   [-104, 10, 30],
-  [-74, 8, 20],
+  // The background cleaner walks the odd bank, staggered half a pitch south.
+  [-72, 8, 22],
+  [-40, 8, 36],
+  [-72, 8, 50],
   [-46, 7, 10],
 ], { color: COLOR.bgwriter, speed: 95, size: 1.1, visible: true, roadOpacity: 0.16 })
 
 route('ckpt.fsync', [
   [-46, 7, 8],
   [-30, -14, 20],
-  [-10, CITY.storage.y + 12, -20],
-  [ANCHOR.diskArray[0], CITY.storage.y + 6, ANCHOR.diskArray[2] + 10],
+  // Destage dives into the wafer floor and lands on the first die.
+  [0, CITY.storage.y + 16, 24],
+  [tableX(0), CITY.storage.y + 5, -86],
 ], { color: COLOR.checkpoint, speed: 80, size: 1.2 })
 
 route('vac.launch', [
@@ -771,6 +793,16 @@ route('bufmap.in', [
   [-42, 8, -62],
   [ANCHOR.bufMapping[0], 6, ANCHOR.bufMapping[2]],
 ], { color: COLOR.shmem, speed: 110, size: 0.8 })
+
+/* --- the wafer spur: plaza stairs down to the NAND die floor --------------
+ * One visible road: it leaves the cache deck on the south, dives to the
+ * storage floor, and runs up the die aisle to the drive rack. */
+route('nand.descend', [
+  [0, CITY.buf.copingTopY + 0.4, 66],
+  [0, 8, 96],
+  [0, CITY.storage.y + 14, 56],
+  [26, CITY.storage.y + 4, -88],
+], { color: COLOR.storage, speed: 80, size: 1.2, visible: true, roadOpacity: 0.18 })
 
 /* --- continuity: the archive estate, the recovery ground, the HA quarter --
  *

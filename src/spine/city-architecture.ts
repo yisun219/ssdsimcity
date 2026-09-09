@@ -35,7 +35,7 @@ export const CITY_ARCHITECTURE_CLAIMS = {
     'This description does not replace the first-person walk. Movement, swimming, looking around from a 1.7 m eye height and the felt experience of distance and scale have no honest text equivalent.',
   districts: {
     clients: {
-      name: 'Clients and connection approach',
+      name: 'Host clients and the PCIe approach',
       anchor: 'clientTerminal',
       represents:
         'The application tier approaching PostgreSQL from outside the server boundary. The plan depicts a centralized, database-facing PgBouncer tier shared by those clients, followed by the pg_hba.conf policy gatehouse and postmaster. Application-host/sidecar and database-host PgBouncer deployments are legitimate alternatives, but they are not the topology drawn here. The gatehouse is a boundary metaphor, not an authentication execution-order claim.',
@@ -50,7 +50,7 @@ export const CITY_ARCHITECTURE_CLAIMS = {
         'The long northern approach makes the application tier visibly external to the server. PgBouncer stands close to the server boundary to identify this drawing as a centralized database-facing tier; all distances are teaching distances, not connection latency.',
     },
     backends: {
-      name: 'Backend row',
+      name: 'Flow towers (one SQ/CQ pair each)',
       represents:
         'Sixteen PostgreSQL backend process slots, one per admitted server connection in this model. Work belongs to a backend; the postmaster creates it and then leaves the query data path.',
       contains: [
@@ -62,7 +62,7 @@ export const CITY_ARCHITECTURE_CLAIMS = {
         'The row is much wider than it is deep so the one-connection/one-backend concurrency model reads as parallel independent slots, not one shared worker building.',
     },
     shmem: {
-      name: 'Buffer pool (shared_buffers) and shared memory plaza',
+      name: 'Device DRAM data cache (interleaved banks)',
       anchor: 'plaza',
       represents:
         'The shared-memory region visible to every backend. The central grid is a representative sample of buffer frames, not every frame in a real shared_buffers allocation.',
@@ -79,7 +79,7 @@ export const CITY_ARCHITECTURE_CLAIMS = {
         'The plaza is the central interchange because backends share it. Its tile count and footprint are a visible sample; neither is a byte-for-byte plan of a production allocation.',
     },
     wal: {
-      name: 'Write-ahead log (WAL) district',
+      name: 'Write path and destage district',
       anchor: 'walVault',
       represents:
         'The durability and change-stream pipeline: WAL records move from wal_buffers through walwriter into pg_wal, then completed segments may be archived while walsenders stream generated WAL independently.',
@@ -94,7 +94,7 @@ export const CITY_ARCHITECTURE_CLAIMS = {
         'The district is a pipeline stretched eastward so write, flush, archive and stream are distinguishable stages. Its length is not a WAL-retention or time scale.',
     },
     storage: {
-      name: 'Storage underworld',
+      name: 'NAND wafer floor',
       anchor: 'dataDir',
       represents:
         'The layered path below volatile shared memory: the operating-system page cache, an explicit volatile/durable boundary, the PostgreSQL data directory and the storage device.',
@@ -110,7 +110,7 @@ export const CITY_ARCHITECTURE_CLAIMS = {
         'Its reserved footprint contains the central plaza footprint in plan and sits far below it, teaching that cached pages are an upper layer over durable files. The footprint ratio is not a database-to-RAM capacity ratio.',
     },
     maintenance: {
-      name: 'Maintenance yard',
+      name: 'Garbage-collection yard',
       anchor: 'checkpointer',
       represents:
         'PostgreSQL background work that acts on shared buffers and relation storage without being the foreground query path.',
@@ -125,7 +125,7 @@ export const CITY_ARCHITECTURE_CLAIMS = {
         'The yard occupies a broad western flank because several independent maintenance processes reach into both the plaza and the data directory. Area does not encode worker cost or throughput.',
     },
     replication: {
-      name: 'Physical replication and standby sites',
+      name: 'Multi-queue fairness and flow isolation',
       anchor: 'standby',
       represents:
         'Two independently lagging physical standbys, each with received, written, flushed and replayed WAL positions and its own buffer and data-directory state.',
@@ -139,7 +139,7 @@ export const CITY_ARCHITECTURE_CLAIMS = {
         'Standby sites are separated platforms rather than small ornaments on the primary: replication preserves another node’s state and can lag or fail independently. The formal district footprint marks standby_a’s apron; standby_b deliberately occupies its own western site.',
     },
     planner: {
-      name: 'Query lab',
+      name: 'FTL lab',
       anchor: 'planner',
       represents:
         'The parse, rewrite, plan and execute stages of the statement owned by a selected backend.',

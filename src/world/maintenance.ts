@@ -1136,7 +1136,7 @@ export const createMaintenance: WorldFactory = (ctx: WorldContext): WorldModule 
   let dbNext = 0
   let dbCount = 0
 
-  signs.plate('removed dead tuples', DECK_X, 12.6, LF[2] - 6.8, 'north', 1.25, COLOR.vacuum, 0.9)
+  signs.plate('invalid pages · erased in blocks', DECK_X, 12.6, LF[2] - 6.8, 'north', 1.25, COLOR.vacuum, 0.9)
   signs.plate(VACUUM_RECLAIM_PLATE_LINES[0], PILE_X, PAINT_Y + 0.02, PILE_Z + 15, 'up', 1.5, COLOR.inkDim, 0.42)
   signs.plate(VACUUM_RECLAIM_PLATE_LINES[1], PILE_X, PAINT_Y + 0.02, PILE_Z + 19, 'up', 1.5, COLOR.inkDim, 0.42)
 
@@ -1481,8 +1481,8 @@ export const createMaintenance: WorldFactory = (ctx: WorldContext): WorldModule 
 
   ctx.register({
     id: 'landfill',
-    name: 'removed dead tuples',
-    role: 'cumulative removed tuples · aggregate spare capacity only',
+    name: 'invalid pages reclaimed',
+    role: 'invalid pages · reclaimed only by block erase',
     kind: 'storage',
     district: 'maintenance',
     object: gLand,

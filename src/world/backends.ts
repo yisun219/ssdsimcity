@@ -233,6 +233,7 @@ export const createBackends: WorldFactory = (ctx): WorldModule => {
   const rng = makeRng(0xb17e5)
   const H = new Float32Array(N) // total tower height
   const SH = new Float32Array(N) // shaft height
+  const SH0 = new Float32Array(N) // skyline height the shaft relaxes toward
   const SY = new Float32Array(N) // shaft centre y
   const XS = new Float32Array(N)
 
@@ -242,6 +243,7 @@ export const createBackends: WorldFactory = (ctx): WorldModule => {
     const h = CITY.backend.minH + rng() * (CITY.backend.maxH - CITY.backend.minH)
     H[i] = h
     SH[i] = Math.max(5, h - PLINTH_H - COLLAR_H - CROWN_H)
+    SH0[i] = SH[i]
     SY[i] = PLINTH_H + SH[i] / 2
   }
 
@@ -849,6 +851,23 @@ export const createBackends: WorldFactory = (ctx): WorldModule => {
       }
 
       /* -- write the visual state ---------------------------------------- */
+      // Tower silhouette = queue pressure. The shaft breathes upward as the
+      // submission queue fills and settles as it drains; the collar rides the
+      // new top. Static geometry, 16 instances — rewriting the matrix per
+      // frame is free next to the fill-rate work the towers already do.
+      if (flow) {
+        const fetchCap = Math.max(1, sim.knobs.queueFetchSize)
+        const pressure = clamp01(flow.sqDepth / Math.max(1, fetchCap * 4))
+        const rise = pressure * 5.2
+        const targetSH = Math.max(5, SH0[i] + rise - 0)
+        SH[i] = damp(SH[i], targetSH, 6, dt)
+        SY[i] = PLINTH_H + SH[i] / 2
+        const top = PLINTH_H + SH[i]
+        setBox(structMesh, i * STRUCT_PARTS + 1, [XS[i], top + COLLAR_H / 2, BZ, BW + 1.3, COLLAR_H, BW + 1.3])
+        setBox(crownMesh, i, [XS[i], top + COLLAR_H + CROWN_H / 2, BZ, BW * 0.8, CROWN_H, BW * 0.8])
+        structMesh.instanceMatrix.needsUpdate = true
+        crownMesh.instanceMatrix.needsUpdate = true
+      }
       // wrap on the floor pitch so the bands never jump when the counter resets
       aScroll[i] = (aScroll[i] + scroll * dts) % 1.74
       aBright[i] = damp(aBright[i], bandBr, 11, dt)

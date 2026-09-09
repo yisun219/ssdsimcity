@@ -1179,8 +1179,8 @@ describe('claims and conventions spine', () => {
       VACUUM_RECLAIM_PLATE_LINES,
       CLAIM_VALUES.vacuumReclaim.plateLines,
     )
-    expect(VACUUM_RECLAIM_PLATE_LINES.join(' '), 'vacuumReclaim: world:landfill plate omits the non-blocking truncation lock')
-      .toMatch(/ACCESS EXCLUSIVE.*non-blocking/iu)
+    expect(VACUUM_RECLAIM_PLATE_LINES.join(' '), 'vacuumReclaim: world:landfill plate omits the erase-before-write rule')
+      .toMatch(/erase-before-write.*no lock/iu)
     const vacuumChapter = CHAPTERS.find((chapter) => chapter.id === 'vacuum')
     expect(vacuumChapter?.body, 'vacuumReclaim: tour:vacuum chapter disagrees')
       .toContain(CLAIM_VALUES.vacuumReclaim.rule)

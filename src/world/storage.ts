@@ -63,7 +63,6 @@ const TILE_W = 1.15
 const ROWS_MIN = 3
 const ROWS_MAX = 44
 /** Block 0 sits here; the file grows south, because files grow at the end. */
-const FILE_Z0 = -89
 const SLOT_Z0 = -94
 const SLOT_Z1 = -18
 const HALF_W = 9.5
@@ -545,21 +544,16 @@ export const createStorage: WorldFactory = (ctx: WorldContext): WorldModule => {
   const tileVm = new Float32Array(tileCap)
   const tileH = new Float32Array(tileCap)
 
-  const PYL_X = [-58, -20, 20, 58]
-  const PYL_Z = [-44, 44]
   for (let ti = 0; ti < N_TABLES; ti++) {
-    const tx = tableX(ti)
+    /* Pages tile their die face: columns across the die (X), rows down it
+     * (Z), growing north from the die's south edge as the file accrues. */
+    const dx = tableX(ti)
     for (let r = 0; r < rowCap[ti]; r++) {
       for (let c = 0; c < COLS; c++) {
         const gi = tileBase[ti] + r * COLS + c
         tileNoise[gi] = rng()
-        const x = tx + (c - (COLS - 1) / 2) * PITCH
-        const z = FILE_Z0 + (r + 0.5) * PITCH
-        for (const px of PYL_X) {
-          for (const pz of PYL_Z) {
-            if (Math.abs(x - px) < 5.0 && Math.abs(z - pz) < 5.0) tileBlocked[gi] = 1
-          }
-        }
+        const x = dx + (c - (COLS - 1) / 2) * PITCH
+        const z = SLOT_Z0 + (r + 0.5) * PITCH
         setTRS(tileMat, gi, x, ROOF_Y, z, TILE_W, 0.001, TILE_W)
         setTRS(capMat, gi, x, ROOF_Y, z, 0.001, 1, 0.001)
       }
@@ -597,7 +591,7 @@ export const createStorage: WorldFactory = (ctx: WorldContext): WorldModule => {
     const fsmOne = new THREE.Group()
     fsmOne.name = `storage.fsm.${TABLES[ti].id}`
     const fsmProxy = new THREE.Mesh(gUnit, mPick)
-    fsmProxy.position.set(tx - PANEL_X, ROOF_Y + 1.8, FILE_Z0 + (rowCap[ti] * PITCH) / 2)
+    fsmProxy.position.set(tx - PANEL_X, ROOF_Y + 1.8, -89 + (rowCap[ti] * PITCH) / 2)
     fsmProxy.scale.set(2.2, 4.0, rowCap[ti] * PITCH)
     fsmOne.add(fsmProxy)
     fsmGroup.add(fsmOne)
@@ -606,7 +600,7 @@ export const createStorage: WorldFactory = (ctx: WorldContext): WorldModule => {
     const vmOne = new THREE.Group()
     vmOne.name = `storage.vm.${TABLES[ti].id}`
     const vmProxy = new THREE.Mesh(gUnit, mPick)
-    vmProxy.position.set(tx + PANEL_X, ROOF_Y + 0.4, FILE_Z0 + (rowCap[ti] * PITCH) / 2)
+    vmProxy.position.set(tx + PANEL_X, ROOF_Y + 0.4, -89 + (rowCap[ti] * PITCH) / 2)
     vmProxy.scale.set(2.2, 1.2, rowCap[ti] * PITCH)
     vmOne.add(vmProxy)
     vmGroup.add(vmOne)
@@ -614,7 +608,8 @@ export const createStorage: WorldFactory = (ctx: WorldContext): WorldModule => {
 
     for (let r = 0; r < rowCap[ti]; r++) {
       const ri = rowBase[ti] + r
-      const z = FILE_Z0 + (r + 0.5) * PITCH
+      // FSM/VM rails run down their die's flanks, one indicator per page row.
+      const z = -89 + (r + 0.5) * PITCH
       setTRS(fsmMat, ri, tx - PANEL_X, ROOF_Y + 0.05, z, 0.001, 0.001, 0.001)
       setTRS(vmMat, ri, tx + PANEL_X, ROOF_Y + 0.12, z, 0.001, 1, 0.001)
     }
@@ -647,43 +642,47 @@ export const createStorage: WorldFactory = (ctx: WorldContext): WorldModule => {
     tableGroups.push(g)
 
     const len0 = rowsBase[ti] * PITCH
+    const SHELL_Z0 = -89
+    const cz0 = SHELL_Z0 + len0 / 2
     const body = new THREE.Mesh(gUnit, mStruct)
-    body.position.set(tx, FLOOR_Y + bodyH / 2, FILE_Z0 + len0 / 2)
+    body.position.set(tx, FLOOR_Y + bodyH / 2, cz0)
     body.scale.set(HALF_W * 2, bodyH, len0)
     g.add(body)
     bodyMeshes.push(body)
-    writeBoxEdges(edgePos, ti, tx, FLOOR_Y + bodyH / 2, FILE_Z0 + len0 / 2, HALF_W, bodyH / 2, len0 / 2)
+    writeBoxEdges(edgePos, ti, tx, FLOOR_Y + bodyH / 2, cz0, HALF_W, bodyH / 2, len0 / 2)
 
     // Roof collider: the tiles live in a shared mesh, so give the picker a box.
     const proxy = new THREE.Mesh(gUnit, mPick)
-    proxy.position.set(tx, ROOF_Y + 1.2, FILE_Z0 + len0 / 2)
+    proxy.position.set(tx, ROOF_Y + 1.2, cz0)
     proxy.scale.set(HALF_W * 2 + 1, 3.4, len0)
     proxy.userData.anatomyPart = 'page'
     g.add(proxy)
     roofProxies.push(proxy)
 
     /* --- fixed architecture on the relation's slot ---------------------- */
+    const sz0 = SLOT_Z0
+    const sz1 = SLOT_Z1
 
     // Service walkways down both flanks, with handrail posts.
     for (const s of [-1, 1]) {
-      addBox(boxHi, tx + s * (HALF_W + 0.75), ROOF_Y - 1.4, (SLOT_Z0 + SLOT_Z1) / 2, 1.5, 0.3, SLOT_Z1 - SLOT_Z0)
-      for (let z = SLOT_Z0 + 3; z < SLOT_Z1; z += 6.4) {
+      addBox(boxHi, tx + s * (HALF_W + 0.75), ROOF_Y - 1.4, (sz0 + sz1) / 2, 1.5, 0.3, SLOT_Z1 - SLOT_Z0)
+      for (let z = sz0 + 3; z < sz1; z += 6.4) {
         addBox(boxHi, tx + s * (HALF_W + 1.35), ROOF_Y - 0.6, z, 0.22, 1.6, 0.22)
       }
     }
     // Recessed bands + vents on the long faces: the building has a section.
-    for (let z = SLOT_Z0 + 5; z < SLOT_Z1 - 4; z += 9.5) {
+    for (let z = sz0 + 5; z < sz1 - 4; z += 9.5) {
       for (const s of [-1, 1]) {
         addBox(boxLo, tx + s * (HALF_W + 0.18), FLOOR_Y + bodyH * 0.42, z, 0.5, bodyH * 0.5, 2.2)
         addBox(boxHi, tx + s * (HALF_W + 0.3), FLOOR_Y + 4.2, z, 0.35, 2.4, 4.4)
       }
     }
     // Ground-level plinth so the shell does not just meet the floor plane.
-    addBox(boxLo, tx, FLOOR_Y + 0.55, (SLOT_Z0 + SLOT_Z1) / 2, HALF_W * 2 + 3, 1.1, SLOT_Z1 - SLOT_Z0)
+    addBox(boxLo, tx, FLOOR_Y + 0.55, (sz0 + sz1) / 2, HALF_W * 2 + 3, 1.1, SLOT_Z1 - SLOT_Z0)
 
     /* --- the gantry: where the I/O conduit lands ------------------------ */
-    const gz0 = SLOT_Z0
-    const gz1 = -52 // stops clear of the plaza column at z = -44
+    const gz0 = sz0
+    const gz1 = sz0 + (SLOT_Z1 - SLOT_Z0) * 0.55
     const legH = GANTRY_Y - 0.45 - ROOF_Y
     for (const s of [-1, 1]) {
       addBox(boxHi, tx + s * (HALF_W + 1.2), GANTRY_Y, (gz0 + gz1) / 2, 1.0, 0.9, gz1 - gz0)
@@ -692,24 +691,23 @@ export const createStorage: WorldFactory = (ctx: WorldContext): WorldModule => {
       }
     }
     // Transverse bridge and the head house the conduit actually plugs into.
-    addBox(boxHi, tx, GANTRY_Y, -60, (HALF_W + 1.7) * 2, 0.8, 2.6)
-    addBox(boxHi, tx, GANTRY_Y - 1.7, -60, 5.2, 2.6, 4.6)
+    addBox(boxHi, tx, GANTRY_Y, gz0 + 14, (HALF_W + 1.7) * 2, 0.8, 2.6)
+    addBox(boxHi, tx, GANTRY_Y - 1.7, gz0 + 14, 5.2, 2.6, 4.6)
   }
 
-  // Column bases where the shared-memory plaza lands on the storage floor.
-  for (const px of PYL_X) {
-    for (const pz of PYL_Z) {
+  // Column bases where the cache-deck bridges land on the storage floor.
+  for (const px of [-46.45, 46.45]) {
+    for (const pz of [-44, 44]) {
       addBox(boxLo, px, FLOOR_Y + 0.6, pz, 10, 1.2, 10)
       addBox(boxHi, px, FLOOR_Y + 1.5, pz, 8.4, 0.7, 8.4)
     }
   }
-
   /* Vacuum front: the blade that sweeps a heap while a worker is scanning it. */
   const vacBlades = instanced(gRiser, mData, N_TABLES)
   heapGroup.add(vacBlades)
   const vacMat = vacBlades.instanceMatrix.array as Float32Array
   const vacCol = vacBlades.instanceColor!.array as Float32Array
-  for (let i = 0; i < N_TABLES; i++) setTRS(vacMat, i, tableX(i), ROOF_Y, FILE_Z0, 0.001, 0.001, 0.001)
+  for (let i = 0; i < N_TABLES; i++) setTRS(vacMat, i, tableX(i), ROOF_Y, -89, 0.001, 0.001, 0.001)
 
   /* ======================================================== 3. INDEXES */
 
@@ -1017,7 +1015,6 @@ export const createStorage: WorldFactory = (ctx: WorldContext): WorldModule => {
       const z = ocZ(r)
       // The kernel's cache is not under Postgres's control: it is full of holes.
       let hole = rng() < 0.17 ? 1 : 0
-      for (const px of PYL_X) for (const pz of PYL_Z) if (Math.abs(x - px) < 7 && Math.abs(z - pz) < 7) hole = 1
       osHole[i] = hole
       osResident[i] = hole ? 0 : rng() * 0.35
       setTRS(osMat, i, x, OC_Y, z, hole ? 0.001 : OC_TILE, 1, hole ? 0.001 : OC_TILE)
@@ -1371,8 +1368,8 @@ export const createStorage: WorldFactory = (ctx: WorldContext): WorldModule => {
       object: tableGroups[ti],
       tier: 1,
       color: def.color,
-      focus: { target: [tx, ROOF_Y - 2, FILE_Z0 + 16], distance: 62, dir: [0.34, 0.56, 0.76] },
-      labelAt: [tx, ROOF_Y + 6, FILE_Z0 - 2],
+      focus: { target: [tableX(ti), ROOF_Y - 2, -89 + 16], distance: 62, dir: [0.34, 0.56, 0.76] },
+      labelAt: [tableX(ti), ROOF_Y + 6, -91],
       readout: (s) => {
         const t = s.tables[ti]
         return `${fmtNum(t.pages)} pages · ${fmtBytes(t.pages * 8192)} · ${fmtNum(t.liveTuples)} live / ${fmtNum(
@@ -1437,8 +1434,8 @@ export const createStorage: WorldFactory = (ctx: WorldContext): WorldModule => {
       object: fsmGroups[ti],
       tier: 2,
       color: COLOR.warn,
-      focus: { target: [tx - PANEL_X, ROOF_Y + 2, FILE_Z0 + 4], distance: 30, dir: [-0.6, 0.5, 0.62] },
-      labelAt: [tx - PANEL_X - 1.5, ROOF_Y + 5, FILE_Z0 + 4],
+      focus: { target: [tx - PANEL_X, ROOF_Y + 2, -85], distance: 30, dir: [-0.6, 0.5, 0.62] },
+      labelAt: [tx - PANEL_X - 1.5, ROOF_Y + 5, -85],
       readout: (s) => {
         const table = s.tables[ti]
         const cap = table.pages * table.def.tuplesPerPage
@@ -1455,8 +1452,8 @@ export const createStorage: WorldFactory = (ctx: WorldContext): WorldModule => {
       object: vmGroups[ti],
       tier: 2,
       color: COLOR.ok,
-      focus: { target: [tx + PANEL_X, ROOF_Y + 2, FILE_Z0 + 10], distance: 34, dir: [0.62, 0.5, 0.6] },
-      labelAt: [tx + PANEL_X + 1.5, ROOF_Y + 5, FILE_Z0 + 10],
+      focus: { target: [tx + PANEL_X, ROOF_Y + 2, -79], distance: 34, dir: [0.62, 0.5, 0.6] },
+      labelAt: [tx + PANEL_X + 1.5, ROOF_Y + 5, -79],
       readout: () =>
         `${fmtPct(vmCover[ti], 0)} derived illustration · no modeled visibility bits or index-only plan`,
     })
@@ -1767,8 +1764,9 @@ export const createStorage: WorldFactory = (ctx: WorldContext): WorldModule => {
       idxBloat[ti] = idxBloat[ti] + (clamp01(bloat * 1.6) - idxBloat[ti]) * (1 - Math.exp(-1.5 * dt))
 
       /* --- the shell follows the file ---------------------------------- */
+      // The shell grows northward from the die's south edge as pages accrue.
       const len = rows * PITCH
-      const cz = FILE_Z0 + len / 2
+      const cz = -89 + len / 2
       const body = bodyMeshes[ti]
       body.position.z = cz
       body.scale.z = len
@@ -1779,12 +1777,12 @@ export const createStorage: WorldFactory = (ctx: WorldContext): WorldModule => {
 
       // The vacuum blade: a violet line crossing the pages it has processed.
       if (front >= 0) {
-        const fz = FILE_Z0 + front * len
+        const fz = -89 + front * len
         setTRS(vacMat, ti, tx, ROOF_Y, fz, HALF_W * 2, 2.2, 0.35)
         const g2 = 0.9 + 0.5 * Math.sin(t * 9)
         setColor3(vacCol, ti, L_VACUUM[0] * g2, L_VACUUM[1] * g2, L_VACUUM[2] * g2)
       } else if (vacHeat[ti] > 0.01) {
-        setTRS(vacMat, ti, tx, ROOF_Y, FILE_Z0 + len, HALF_W * 2, 2.2 * vacHeat[ti], 0.35)
+        setTRS(vacMat, ti, tx, ROOF_Y, -89 + len, HALF_W * 2, 2.2 * vacHeat[ti], 0.35)
         setColor3(vacCol, ti, L_VACUUM[0] * vacHeat[ti], L_VACUUM[1] * vacHeat[ti], L_VACUUM[2] * vacHeat[ti])
       } else {
         vacMat[ti * 16 + 5] = 0.001
@@ -2503,10 +2501,12 @@ function buildFloorTexture(rng: () => number, W: number): {
   for (let ti = 0; ti < N_TABLES; ti++) {
     const def = TABLES[ti]
     const tx = tableX(ti)
+    const bz0 = -94
+    const bz1 = -18
     const x0 = X(tx - HALF_W - 2.5)
     const w = (HALF_W + 2.5) * 2 * px
-    const y0 = Y(SLOT_Z0)
-    const h = (SLOT_Z1 - SLOT_Z0) * px
+    const y0 = Y(bz0)
+    const h = (bz1 - bz0) * px
 
     g.save()
     g.setLineDash([14, 10])
@@ -2532,17 +2532,17 @@ function buildFloorTexture(rng: () => number, W: number): {
       g.stroke()
     }
 
-    label(def.name, tx, SLOT_Z0 - 3.4, 3.2, hexA(def.color, 0.92), 'center', 0, true)
-    label(`base/16384/${24591 + ti * 7}`, tx, SLOT_Z0 + 1.2, 1.9, 'rgba(143,165,196,0.75)')
-    label(`${def.pages} pages · ${def.tuplesPerPage} tuples/page`, tx, SLOT_Z0 + 4.2, 1.5, 'rgba(143,165,196,0.5)')
-    label('_fsm', tx - PANEL_X - 2.6, FILE_Z0 + 6, 1.6, 'rgba(255,204,85,0.7)', 'center', -Math.PI / 2, true)
-    label('_vm', tx + PANEL_X + 2.6, FILE_Z0 + 6, 1.6, 'rgba(87,227,137,0.7)', 'center', Math.PI / 2, true)
+    label(def.name, tx, bz0 - 3.4, 3.2, hexA(def.color, 0.92), 'center', 0, true)
+    label(`base/16384/${24591 + ti * 7}`, tx, bz0 + 1.2, 1.9, 'rgba(143,165,196,0.75)')
+    label(`${def.pages} pages · ${def.tuplesPerPage} tuples/page`, tx, bz0 + 4.2, 1.5, 'rgba(143,165,196,0.5)')
+    label('_fsm', tx - PANEL_X - 2.6, bz0 + 6, 1.6, 'rgba(255,204,85,0.7)', 'center', -Math.PI / 2, true)
+    label('_vm', tx + PANEL_X + 2.6, bz0 + 6, 1.6, 'rgba(87,227,137,0.7)', 'center', Math.PI / 2, true)
 
     // Page ruler down the west flank: block numbers, every ten rows.
     g.fillStyle = 'rgba(120,150,200,0.5)'
     for (let r = 0; r <= ROWS_MAX; r += 10) {
-      const wz = FILE_Z0 + r * PITCH
-      if (wz > SLOT_Z1) break
+      const wz = bz0 + r * PITCH
+      if (wz > bz1) break
       g.fillRect(X(tx - HALF_W - 2.2), Y(wz) - 1, 2.4 * px, 2)
       label(`${r * COLS * PAGES_PER_TILE}`, tx - HALF_W - 4.4, wz, 1.35, 'rgba(120,150,200,0.55)', 'right')
     }

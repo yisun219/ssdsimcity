@@ -259,9 +259,21 @@ function procY(xid: number, x: number): number {
   return 1.1 + PROC_H * clamp01(1 - (xid - x) / XID_SPAN)
 }
 
-/** bufferTilePos() allocates; update() cannot. Same maths, no array. */
+/**
+ * The cache floor reads as a device DRAM array: two interleaved banks, the
+ * even bank and the odd bank, offset by half a pitch. The stagger is what a
+ * printed memory array looks like from above — and it makes each bank's
+ * destage debt readable as its own stripe. `bufferTilePos()` allocates;
+ * update() cannot. Same maths, no array. The clock hand, sweep sheet and
+ * collision envelope all derive from these two functions, so the stagger
+ * propagates everywhere at once.
+ */
 function tileX(idx: number): number {
-  return -HALF_GRID + (idx % G) * PITCH
+  const col = idx % G
+  const row = Math.floor(idx / G)
+  // Banks interlock inside the same envelope: even rows shift half a pitch
+  // west, odd rows half a pitch east, so the grid span never changes.
+  return -HALF_GRID + col * PITCH + (row % 2 === 0 ? -PITCH / 2 : PITCH / 2)
 }
 function tileZ(idx: number): number {
   return -HALF_GRID + Math.floor(idx / G) * PITCH

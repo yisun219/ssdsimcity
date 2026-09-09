@@ -220,7 +220,7 @@ export const DOCS_MEMORY: ComponentDoc[] = [
       },
     ],
     metrics: [
-      { label: 'Buffer pool', get: poolSize, hint: 'shared_buffers; the plaza is a representative frame sample' },
+      { label: 'Data cache frames', get: poolSize, hint: 'device DRAM cache; the plaza is a representative frame sample' },
       { label: 'Hit ratio', get: (s) => fmtPct(nz(s.buffers?.hitRatio)) },
       { label: 'Reads', get: (s) => `${fmtNum(nz(s.stats?.ioReadPerSec))} pages/s`, hint: 'modeled shared-buffer-miss reads; OS-cache animation does not alter this counter' },
       {
@@ -722,7 +722,7 @@ export const DOCS_MEMORY: ComponentDoc[] = [
       },
     ],
     metrics: [
-      { label: 'Buffer pool', get: poolSize, hint: 'shared_buffers; the visual sample is shown separately in the plaza' },
+      { label: 'Data cache frames', get: poolSize, hint: 'device DRAM cache; the visual sample is shown separately in the plaza' },
       { label: 'WAL buffers', get: (s) => fmtBytes(nz(s.wal?.bufferCapacity)) },
       { label: 'Proc slots', get: (s) => `${fmtNum(nz(s.stats?.activeBackends))} / ${fmtNum(connectionCapacity(s))}` },
       { label: 'Lock waits', get: (s) => fmtNum((s.locks ?? []).length), hint: 'edges currently in the wait-for graph' },
