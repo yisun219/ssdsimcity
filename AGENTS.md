@@ -37,7 +37,7 @@ For anything visible, use the headless driver in this repository:
 
 ```bash
 CDP_PORT=9501 node tools/shoot.mjs \
-  http://localhost:5173/ /tmp/pgsimcity.png 45000 1280 760
+  http://localhost:5173/ /tmp/ssdsimcity.png 45000 1280 760
 ```
 
 Choose a unique `CDP_PORT` from 9500–9900 for every concurrent driver. Software
@@ -61,7 +61,7 @@ If a run is killed, its slot is reaped after ten minutes, so a dead agent
 cannot deadlock the gate. `tools/reap.sh` clears them immediately along with
 browsers older than fifteen minutes.
 
-`window.PGSIMCITY` exposes `bus`, `sim`, `rig`, `registry`, `gfx`, and `flows`.
+`window.SSDSIMCITY` exposes `bus`, `sim`, `rig`, `registry`, `gfx`, and `flows`.
 Use `sim.setKnob()`, `sim.runScenario()`, or `bus.emit('focus', { id: '...' })`
 to stage a view. Inspect the screenshot itself and the driver's console and
 exception output; creating an image file alone is not verification.

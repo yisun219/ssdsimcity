@@ -1,12 +1,12 @@
 # Model accuracy and limitations
 
-PGSimCity is still **0.x**: early and moving. The 3D city is a *model* of
+SSDSimCity is still **0.x**: early and moving. The 3D city is a *model* of
 PostgreSQL, not an emulator: no PostgreSQL source code runs in that city, and
 the numbers are scaled so a human can watch them. The opt-in Query flow and
-[Machine](https://nikolays.github.io/PGSimCity/machine/) can run PGlite, a real in-memory PostgreSQL compiled to
+[Machine](https://yisun219.github.io/ssdsimcity/machine/) can run PGlite, a real in-memory PostgreSQL compiled to
 WebAssembly.
 
-PGSimCity targets the PostgreSQL 18 major line. PostgreSQL 18.6 is the
+SSDSimCity targets the PostgreSQL 18 major line. PostgreSQL 18.6 is the
 reviewed reference release against which its claims were verified; mechanism
 claims follow the [`REL_18_STABLE` source](https://github.com/postgres/postgres/tree/REL_18_STABLE).
 For example, PostgreSQL 18's bulk-read strategy starts at 256 KiB and grows

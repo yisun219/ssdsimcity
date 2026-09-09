@@ -15,7 +15,7 @@
  *                    per the steady-state valid/invalid distribution; only a
  *                    small free-block pool remains (paper §4.4).
  *
- * Every count here is a TEACHING SAMPLE, like PGSimCity's 1,024-frame buffer
+ * Every count here is a TEACHING SAMPLE, like SSDSimCity's 1,024-frame buffer
  * plaza: the real device is orders of magnitude larger, and the world modules
  * render one representative object per modelled unit.
  * ==========================================================================*/
@@ -181,7 +181,7 @@ export interface GcState {
 
 /* ---------------------------------------------------------------------------
  * NAND timing — MQSim's three flash-latency components (paper §4.1).
- * Values are the FAST'18 Table 3 device, stretched ~100× like PGSimCity's
+ * Values are the FAST'18 Table 3 device, stretched ~100× like SSDSimCity's
  * backend lifecycle stretch, so a 75 µs read renders at observable pace.
  * Rates and queues are NOT stretched.
  * -------------------------------------------------------------------------*/

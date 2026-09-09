@@ -163,7 +163,7 @@ describe('native multi-touch gestures', () => {
         for (let attempt = 0; attempt < 120 && !window.SSDSIMCITY; attempt += 1) {
           await new Promise((resolve) => setTimeout(resolve, 100))
         }
-        if (!window.SSDSIMCITY) throw new Error('PGSimCity did not initialise')
+        if (!window.SSDSIMCITY) throw new Error('SSDSimCity did not initialise')
       })()`,
     }], async ({ evaluate, send }): Promise<TouchActionReport> => {
       const targets = await evaluate(ENUMERATE_GESTURE_TARGETS, {

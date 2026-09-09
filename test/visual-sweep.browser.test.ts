@@ -35,7 +35,7 @@ describe('live rendered city visual sweep', () => {
         for (let attempt = 0; attempt < 240 && !window.SSDSIMCITY; attempt += 1) {
           await new Promise((resolve) => setTimeout(resolve, 250))
         }
-        if (!window.SSDSIMCITY) throw new Error('PGSimCity did not expose its browser handle')
+        if (!window.SSDSIMCITY) throw new Error('SSDSimCity did not expose its browser handle')
         window.SSDSIMCITY.sim.setKnob('paused', true)
         window.SSDSIMCITY.setThemeMode('day', { persist: false })
         window.SSDSIMCITY.bus.emit('quality', { level: 'medium' })

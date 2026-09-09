@@ -1,6 +1,6 @@
 ---
 name: Report a problem with a PostgreSQL claim
-about: Report a PGSimCity claim that disagrees with PostgreSQL
+about: Report a claim that disagrees with the modeled SSD behavior
 title: "[PostgreSQL mismatch] "
 labels: ""
 assignees: ""
@@ -8,7 +8,7 @@ assignees: ""
 
 ## Before submitting
 
-Use this issue to report a problem with a PostgreSQL claim in PGSimCity. Fill in the correction and supporting evidence below.
+Use this issue to report a problem with a modeled-behavior claim in SSDSimCity. Fill in the correction and supporting evidence below.
 
 If you opened the reporting link out of curiosity or do not have a correction to report, close this tab without submitting the issue.
 

@@ -1,16 +1,16 @@
-# CLAUDE.md -- PGSimCity
+# CLAUDE.md -- SSDSimCity
 
 ## Project
 
-PGSimCity is an explorable 3D city that teaches how PostgreSQL works. The
+SSDSimCity is an explorable 3D city that teaches how a modern multi-queue SSD works. The
 buildings and motion represent real mechanisms; the numbers are deliberately
 scaled so people can see those mechanisms operate. The city is a model, not an
 emulator, and no PostgreSQL source code runs in the 3D application. The separate
 2D Query flow at `observability/` and workbench at `machine/` may run opt-in
 PostgreSQL WebAssembly under the dependency and loading rules below.
 
-Use **PGSimCity** in prose and headings and `pgsimcity` for package-style names.
-Repository: `NikolayS/PGSimCity`.
+Use **SSDSimCity** in prose and headings and `ssdsimcity` for package-style names.
+Repository: `yisun219/ssdsimcity`.
 
 The intended reader is technically capable but may be new to database
 operations. Explain PostgreSQL precisely without assuming operator vocabulary,
@@ -42,7 +42,7 @@ machine/           psql workbench and 2D architecture board
 - `src/ui` and `src/observability` explain and expose state; they do not become
   alternate simulation engines.
 
-The browser debugging surface is `window.PGSIMCITY`, including the simulation,
+The browser debugging surface is `window.SSDSIMCITY`, including the simulation,
 event bus, registry, camera rig, renderer state, and flow controller.
 
 ## Stack
@@ -75,7 +75,7 @@ Analytics or PGlite failure and blocking must never break the model path.
 Follow the shared Postgres.AI engineering rules:
 https://gitlab.com/postgres-ai/rules/-/tree/main/rules
 
-The rules below are PGSimCity additions and clarifications. If they conflict
+The rules below are SSDSimCity additions and clarifications. If they conflict
 with the shared rules, this file wins.
 
 ### TypeScript and comments
@@ -363,7 +363,7 @@ findings that are deliberately left must be stated in the release notes.
 Copyright 2026 Nikolay Samokhvalov. Apache-2.0 license.
 
 Keep `NOTICE` with distributions. PostgreSQL is a trademark of the PostgreSQL
-Community Association of Canada. Never imply that PGSimCity is affiliated with,
+Community Association of Canada. Never imply that SSDSimCity is affiliated with,
 sponsored by, or endorsed by the PostgreSQL project, PostgreSQL Global
 Development Group, or PostgreSQL Community Association of Canada. Preserve
 third-party copyright and license notices.

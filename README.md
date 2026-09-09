@@ -8,12 +8,12 @@ queue through the FTL into NAND, investigate why writes suddenly stall when
 garbage collection starts, and see what changes when the write cache, mapping
 table, and flash channels become bottlenecks. Modeled on MQSim (FAST 2018).
 
-**[Explore the city](https://nikolays.github.io/PGSimCity/)** ·
+**[Explore the SSD city](https://yisun219.github.io/ssdsimcity/)** ·
 [Start an investigation](#start-here-investigate-a-vacuum-blockade)
 
 No installation. Runs in a browser with WebGL2.
 
-[![PGSimCity at golden hour: the buffer pool, backend avenue and surrounding PostgreSQL districts. Click to explore the city.](docs/screenshot.png)](https://nikolays.github.io/PGSimCity/)
+[![SSDSimCity at golden hour: the DRAM data cache, flow towers and surrounding SSD districts. Click to explore the city.](docs/screenshot.png)](https://yisun219.github.io/ssdsimcity/)
 
 [Featured in InfoQ · IBM Think · Gizmodo · GIGAZINE](#press-coverage)
 
@@ -21,7 +21,7 @@ No installation. Runs in a browser with WebGL2.
 
 **A table keeps growing even though autovacuum is running. Why?**
 
-1. [Open the city](https://nikolays.github.io/PGSimCity/) and choose **Investigate**.
+1. [Open the SSD city](https://yisun219.github.io/ssdsimcity/) and choose **Investigate**.
    This starts the guided vacuum-blockade case.
 2. Inspect and record the table, worker, snapshot and application-owner evidence.
    Explain what prevents cleanup before choosing an intervention.
@@ -37,9 +37,9 @@ Evidence and notes belong to the current attempt; they do not survive a reload.
 
 | Experience | What you can do |
 |---|---|
-| **[City](https://nikolays.github.io/PGSimCity/)** | Explore the engine spatially, follow the guided tour and investigate a vacuum incident. |
-| **[Diagnose](https://nikolays.github.io/PGSimCity/observability/)** | Follow a query’s path and inspect the simulation through a 2D diagnostic interface. |
-| **[Machine](https://nikolays.github.io/PGSimCity/machine/)** | Run real SQL with opt-in PGlite beside a 2D architecture board; measured and modeled values are labeled separately. |
+| **[City](https://yisun219.github.io/ssdsimcity/)** | Explore the engine spatially, follow the guided tour and investigate a vacuum incident. |
+| **[Diagnose](https://yisun219.github.io/ssdsimcity/observability/)** | Follow a query’s path and inspect the simulation through a 2D diagnostic interface. |
+| **[Machine](https://yisun219.github.io/ssdsimcity/machine/)** | Run real SQL with opt-in PGlite beside a 2D architecture board; measured and modeled values are labeled separately. |
 
 ## How much to trust this
 
@@ -69,11 +69,11 @@ devices. [Accessibility and alternatives](ACCESSIBILITY.md).
 
 **Featured in InfoQ, IBM Think, Gizmodo and GIGAZINE.**
 
-Selected reporting and hands-on reviews of PGSimCity:
+Selected reporting and hands-on reviews of the upstream PostgreSQL city (PGSimCity), whose engine this city inherits:
 
 | Publication | Article | Published |
 |---|---|---|
-| **InfoQ** | [How PGSimCity Turns PostgreSQL Complexity into a Virtual City 3D Simulation](https://www.infoq.com/news/2026/08/pgsimcity/) — Olimpiu Pop on the project’s architecture and educational approach. Also available in [简体中文](https://www.infoq.cn/article/umVdo2GaEyONQLWNmPZ9), translated by 田橙. | August 16, 2026 |
+| **InfoQ** | [How the upstream PGSimCity Turns PostgreSQL Complexity into a Virtual City 3D Simulation](https://www.infoq.com/news/2026/08/pgsimcity/) — Olimpiu Pop on the project’s architecture and educational approach. Also available in [简体中文](https://www.infoq.cn/article/umVdo2GaEyONQLWNmPZ9), translated by 田橙. | August 16, 2026 |
 | **IBM Think** | [Someone turned PostgreSQL into a city you can walk around in](https://www.ibm.com/think/news/pgsimcity-postgresql-3d-visualization) — Antonia Davison’s feature, also included in the IBM Think newsletter. | July 31, 2026 |
 | **Gizmodo** | [This SimCity-Like Visualization Turns Tech’s Most Boring Systems Into Fun](https://gizmodo.com/this-simcity-like-visualization-turns-techs-most-boring-systems-into-fun-2000791397) — Tom Hawking’s hands-on review. | July 28, 2026 |
 | **GIGAZINE** | [データベース「PostgreSQL」がどのように実際には内部で動いているかがシムシティっぽい3Dでわかる「PGSimCity」](https://gigazine.net/news/20260728-pgsimcity-postgresql/) — a screenshot-led Japanese walkthrough of connections, query planning, buffers, page storage, WAL, vacuum and replication. [English edition](https://gigazine.net/gsc_news/en/20260728-pgsimcity-postgresql/). | July 28, 2026 |
@@ -238,7 +238,7 @@ Stack: [three.js](https://threejs.org) r185, TypeScript, Vite. three.js is the
 and Machine may lazy-load PGlite after reader opt-in. There is no framework,
 and Plausible analytics is the sole external service.
 
-`window.PGSIMCITY` in the browser console includes `sim`, `registry`, `bus`,
+`window.SSDSIMCITY` in the browser console includes `sim`, `registry`, `bus`,
 `rig`, `gfx` and `flows` if you would rather drive the city from the outside.
 For formulas, review history and known simplifications, see
 [Model accuracy and limitations](docs/MODEL-ACCURACY.md). Each inspector names
@@ -248,7 +248,7 @@ material simplifications at the point where they matter.
 
 The [accuracy boundary](docs/MODEL-ACCURACY.md) makes internals
 such as the clock sweep's frame-by-frame victim choice observable. The separate
-Query flow and the [Machine](https://nikolays.github.io/PGSimCity/machine/) offer opt-in PGlite modes: real PostgreSQL
+Query flow and the [Machine](https://yisun219.github.io/ssdsimcity/machine/) offer opt-in PGlite modes: real PostgreSQL
 supplies parsing, plans, catalogs, buffer counters, errors and results, while the
 visual model supplies the otherwise hidden interior. Each surface labels those
 sources separately because PostgreSQL exposes the former and not the latter.
@@ -278,12 +278,12 @@ same-origin PGlite JavaScript, data and WebAssembly assets and run an in-memory
 PostgreSQL in the browser. Their model paths continue to work when analytics or
 PGlite is blocked.
 
-**Analytics and privacy.** PGSimCity uses
+**Analytics and privacy.** SSDSimCity uses
 [Plausible](https://plausible.io/) for aggregate, cookie-free analytics on the
 city, observability, and Machine pages. It records pageviews, unique visitors,
 referring sites, bounce rate, visit duration and interactions such as starting
 the tour, changing playback, opening a panel, tracing a statement, selecting a
-building or following an outbound link. PGSimCity sends no names, email addresses,
+building or following an outbound link. SSDSimCity sends no names, email addresses,
 free-form input, browser fingerprint or application-supplied personal data, and
 creates no analytics cookies, analytics local storage, advertising identifier
 or session recording. Blocking `plausible.io` stops measurement without
@@ -300,7 +300,7 @@ is actually shipped.
 
 ## Licence
 
-PGSimCity is an independent, non-commercial educational visualization of
+SSDSimCity is an independent, non-commercial educational visualization of
 PostgreSQL internals. It is not affiliated with, sponsored, endorsed, or
 approved by Electronic Arts Inc. SimCity is a trademark of Electronic Arts Inc.
 This project contains no SimCity code, assets, artwork, logos, characters,
@@ -309,5 +309,5 @@ audio, or game content.
 [Apache-2.0](LICENSE). Copyright 2026 Nikolay Samokhvalov. See [NOTICE](NOTICE).
 
 PostgreSQL is a trademark of the PostgreSQL Community Association of Canada.
-PGSimCity is an independent educational project and is not affiliated with,
+SSDSimCity is an independent educational project and is not affiliated with,
 sponsored by, or endorsed by the PostgreSQL project.

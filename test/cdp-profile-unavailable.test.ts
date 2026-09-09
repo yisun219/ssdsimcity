@@ -35,7 +35,7 @@ afterEach(() => {
 })
 
 it('retains an owned profile when neither process source is readable', () => {
-  const root = mkdtempSync(join(tmpdir(), 'pgsimcity-profile-unknown-'))
+  const root = mkdtempSync(join(tmpdir(), 'ssdsimcity-profile-unknown-'))
   roots.push(root)
   const profile = acquireCdpProfile({ root, reap: false })
 
@@ -49,7 +49,7 @@ it('retains an owned profile when neither process source is readable', () => {
 })
 
 it('does not reap an old profile on unknown usage, even with a dead owner', () => {
-  const root = mkdtempSync(join(tmpdir(), 'pgsimcity-profile-unknown-'))
+  const root = mkdtempSync(join(tmpdir(), 'ssdsimcity-profile-unknown-'))
   roots.push(root)
   const profile = acquireCdpProfile({ root, reap: false })
   const now = Date.now()

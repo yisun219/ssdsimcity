@@ -81,7 +81,7 @@ describe.skipIf(process.env.SSDSIMCITY_BROWSER_SOAK !== '1')('long browser-path 
         for (let attempt = 0; attempt < 240 && !window.SSDSIMCITY; attempt++) {
           await new Promise((resolve) => setTimeout(resolve, 250))
         }
-        if (!window.SSDSIMCITY) throw new Error('PGSimCity did not expose its browser handle')
+        if (!window.SSDSIMCITY) throw new Error('SSDSimCity did not expose its browser handle')
         const pg = window.SSDSIMCITY
         pg.bus.emit('quality', { level: 'low' })
         pg.sim.setKnob('timeScale', 20)

@@ -23,7 +23,7 @@
  *     (paper §3.3).
  *
  * THREE HONEST DISTORTIONS, all deliberate, matching the house style of the
- * PGSimCity engine this city inherits:
+ * SSDSimCity engine this city inherits:
  *
  *  1. DEVICE LATENCY IS STRETCHED for anything sub-second. A real NAND read
  *     is ~75 µs and an erase ~3.8 ms; at 30 Hz those are invisible. The

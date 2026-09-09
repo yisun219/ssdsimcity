@@ -1,6 +1,6 @@
 # Accessibility boundary and text routes
 
-PGSimCity's PostgreSQL lessons are intended to remain usable when the 3D city
+SSDSimCity's lessons are intended to remain usable when the 3D city
 is not. This document records the boundary honestly; it is not a claim that the
 3D scene itself has a nonvisual equivalent.
 

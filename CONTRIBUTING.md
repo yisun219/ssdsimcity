@@ -1,4 +1,4 @@
-# Contributing to PGSimCity
+# Contributing to SSDSimCity
 
 Thanks for helping make PostgreSQL internals understandable and accurate.
 
@@ -51,7 +51,7 @@ npm run build
 Every bug fix starts with a failing automated test that reproduces the defect.
 The source fix is the change that turns that test green. **No test, no fix.**
 
-This is mandatory because PGSimCity lost the same Slonik plate shape across
+This is mandatory because SSDSimCity lost the same Slonik plate shape across
 four commits. A property-based characterization test would have identified the
 breaking commit immediately and prevented the regression from landing silently.
 CI runs `npm test` and rejects a change if any test is red.

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 const entry = (rel: string) => fileURLToPath(new URL(rel, import.meta.url))
 const pkg = JSON.parse(readFileSync(entry('./package.json'), 'utf8')) as { version: string }
 const vitePreloadHelper = '\0vite/preload-helper.js'
-const machinePreloadHelper = '\0pgsimcity-machine-preload-helper'
+const machinePreloadHelper = '\0ssdsimcity-machine-preload-helper'
 const localPreloadImporters = new Set([
   entry('./machine/magnum.js'),
   entry('./machine/postgres.js'),
@@ -64,12 +64,12 @@ const buildSha = shortGitSha()
 export default defineConfig({
   base: './',
   plugins: [{
-    name: 'pgsimcity-boot-build-label',
+    name: 'ssdsimcity-boot-build-label',
     transformIndexHtml(html) {
       return html.replace('%SSDSIMCITY_BUILD_LABEL%', `v${pkg.version} · ${buildSha}`)
     },
   }, {
-    name: 'pgsimcity-machine-local-preload',
+    name: 'ssdsimcity-machine-local-preload',
     enforce: 'pre',
     resolveId(id, importer) {
       if (

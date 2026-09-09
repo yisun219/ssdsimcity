@@ -14,7 +14,7 @@ afterEach(() => {
 
 describe('CDP run cleanup', () => {
   it('stops Chrome before removing its profile and releasing its slot', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'pgsimcity-cdp-run-test-'))
+    const root = mkdtempSync(join(tmpdir(), 'ssdsimcity-cdp-run-test-'))
     roots.push(root)
     const profile = acquireCdpProfile({ root, port: 9555, reap: false })
     const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'])

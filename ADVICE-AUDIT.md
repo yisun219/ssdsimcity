@@ -2,7 +2,7 @@
 
 ## Result
 
-This review asks whether a tired operator following PGSimCity's advice would
+This review asks whether a tired operator following SSDSimCity's advice would
 improve the incident. It does not repeat the existing claim oracle. I staged
 the highest-cost Diagnose and scenario actions on PostgreSQL 13.23, 17.9, and
 18.3 and then followed the displayed advice literally.

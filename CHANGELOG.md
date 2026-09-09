@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to PGSimCity are recorded here.
+All notable changes to SSDSimCity are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
@@ -2305,7 +2305,7 @@ inside it would teach that the geography is arbitrary.
   to perceive, so labels never appeared to scale at all. Now 1.50 to 1.00, with
   chips retiring past roughly 690 m rather than clamping at the legibility floor.
   A zoomed-out phone view keeps three district names at 1.9% of the frame.
-- The checkpoint indicator painted through the PGSimCity wordmark. It was grid
+- The checkpoint indicator painted through the SSDSimCity wordmark. It was grid
   overflow, not a stacking order problem.
 
 ---
@@ -2492,7 +2492,7 @@ The city reached the top of Hacker News. This is what the thread asked for.
 
 ### Added
 
-- **The trademark notice.** PGSimCity is an independent, non-commercial
+- **The trademark notice.** SSDSimCity is an independent, non-commercial
   educational visualization of PostgreSQL internals, not affiliated with,
   sponsored, endorsed or approved by Electronic Arts Inc., and SimCity is a
   trademark of Electronic Arts Inc. The notice appears on the loading screen,
@@ -3009,7 +3009,7 @@ release names the ones we know about.
 First public release. A prototype: it works end to end, and it contains
 mistakes.
 
-PGSimCity is an explorable 3D city, running entirely in the browser, in which
+SSDSimCity is an explorable 3D city, running entirely in the browser, in which
 every building is a real PostgreSQL mechanism. It is built for engineers who are
 good at their job and have never had to operate a database.
 

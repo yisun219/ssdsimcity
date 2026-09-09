@@ -20,7 +20,7 @@ import {
 const roots: string[] = []
 
 function temporaryRoot() {
-  const root = mkdtempSync(join(tmpdir(), 'pgsimcity-cdp-profile-test-'))
+  const root = mkdtempSync(join(tmpdir(), 'ssdsimcity-cdp-profile-test-'))
   roots.push(root)
   return root
 }

@@ -7,7 +7,7 @@
     "node": "^20.19.0 || >=22.12.0"
   },
   "license": "Apache-2.0",
-  "description": "An independent, non-commercial educational visualization of modern multi-queue SSD internals, modeled on MQSim (FAST 2018). Fork-style derivative of PGSimCity.",
+  "description": "An independent, non-commercial educational visualization of modern multi-queue SSD internals, modeled on MQSim (FAST 2018). Educational SSD city; unrelated to any PostgreSQL visualization.",
   "author": "yisun219",
   "homepage": "https://yisun219.github.io/ssdsimcity/",
   "repository": {
