@@ -15,15 +15,15 @@ export { rid } from '../core/route-ids'
  * North is -Z, east is +X. One world unit ≈ one metre; a person would be ~1.8.
  *
  *                              ▲ -Z  (north)
- *              CLIENT TERMINAL  z ≈ -352 .. -288   (outside the server)
- *              PGBOUNCER        z = -264            (central database-facing tier)
- *              SERVER BOUNDARY  z = -252           (fence + gatehouse)
- *              POSTMASTER  z = -215
- *              BACKENDS    z = -130   x = -112 .. 112
- *   MAINTENANCE            SHARED MEMORY PLAZA            WAL DISTRICT
- *   x = -250..-110         x = -78..78  z = -62..62       x = 110..250
- *              STORAGE (underground, y = -52)  x = -150..150  z = -110..110
- *              REPLICATION  z = +150 .. +340
+ *              CLIENT HOSTS     z ≈ -352 .. -288   (outside the device)
+ *              NVMe QUEUE PAIRS z = -264            (submission/completion)
+ *              PCIe FABRIC      z = -252           (the wire into the device)
+ *              FTL GATE         z = -215
+ *              FLOW TOWERS  z = -130   x = -112 .. 112   (one SQ/CQ pair each)
+ *   GC YARD            DEVICE DRAM CACHE             FLASH WRITE PATH
+ *   x = -250..-110     x = -78..78  z = -62..62      x = 110..250
+ *              NAND ARRAY (underground, y = -52)  x = -150..150  z = -110..110
+ *              MULTI-QUEUE FAIRNESS  z = +150 .. +340
  *                              ▼ +Z  (south)
  *
  * Districts must stay inside their footprint and must read every shared

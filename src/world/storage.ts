@@ -1493,7 +1493,7 @@ export const createStorage: WorldFactory = (ctx: WorldContext): WorldModule => {
 
   ctx.register({
     id: 'disk.array',
-    name: 'Storage',
+    name: 'NAND array',
     role: 'illustrative device layer · no calibrated latency or queue',
     kind: 'storage',
     district: 'storage',

@@ -685,7 +685,7 @@ export const createPlanner: WorldFactory = (ctx: WorldContext): WorldModule => {
 
   ctx.register({
     id: 'planner.lab',
-    name: 'Query lab',
+    name: 'FTL lab',
     role: 'fixed model stages and plan templates',
     kind: 'concept',
     district: 'planner',

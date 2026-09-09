@@ -574,7 +574,7 @@ export const createBackends: WorldFactory = (ctx): WorldModule => {
 
   ctx.register({
     id: 'backend.row',
-    name: 'Backends',
+    name: 'Flow towers',
     role: 'one modeled slot per connection · process residency is not costed',
     kind: 'process',
     district: 'backends',

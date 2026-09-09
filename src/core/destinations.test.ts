@@ -14,7 +14,7 @@ describe('canonical destinations', () => {
     }
   })
 
-  it('uses the project owner’s required plaza name', () => {
-    expect(destinationForDistrict('shmem')?.name).toBe('Buffer pool (shared_buffers)')
+  it('uses the canonical plaza name', () => {
+    expect(destinationForDistrict('shmem')?.name).toBe('Device DRAM data cache')
   })
 })

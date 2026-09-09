@@ -16,19 +16,19 @@ export interface Destination {
  * free to name the specific building at the destination.
  */
 export const DESTINATIONS: readonly Destination[] = [
-  { district: 'clients', id: 'client.pool', name: 'Clients', shortName: 'Clients' },
-  { district: 'backends', id: 'backend.row', name: 'Backends', shortName: 'Backends' },
+  { district: 'clients', id: 'client.pool', name: 'Host clients', shortName: 'Hosts' },
+  { district: 'backends', id: 'backend.row', name: 'Flow towers (SQ/CQ pairs)', shortName: 'Flows' },
   {
     district: 'shmem',
     id: 'shared.buffers',
-    name: 'Buffer pool (shared_buffers)',
-    shortName: 'Buffer pool',
+    name: 'Device DRAM data cache',
+    shortName: 'DRAM cache',
   },
-  { district: 'wal', id: 'wal.vault', name: 'WAL', shortName: 'WAL' },
-  { district: 'storage', id: 'storage.datadir', name: 'Storage', shortName: 'Storage' },
-  { district: 'planner', id: 'planner.lab', name: 'Query lab', shortName: 'Query lab' },
-  { district: 'maintenance', id: 'checkpointer', name: 'Maintenance', shortName: 'Maint.' },
-  { district: 'replication', id: 'replica.standby', name: 'Standby', shortName: 'Standby' },
+  { district: 'wal', id: 'wal.vault', name: 'Write path (destage)', shortName: 'Destage' },
+  { district: 'storage', id: 'storage.datadir', name: 'NAND array', shortName: 'NAND' },
+  { district: 'planner', id: 'planner.lab', name: 'FTL lab', shortName: 'FTL' },
+  { district: 'maintenance', id: 'checkpointer', name: 'Garbage collection', shortName: 'GC' },
+  { district: 'replication', id: 'replica.standby', name: 'Multi-queue fairness', shortName: 'Fairness' },
 ] as const
 
 const BY_DISTRICT = new Map<DistrictId, Destination>(

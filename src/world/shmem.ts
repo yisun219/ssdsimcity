@@ -1393,7 +1393,7 @@ export const createShmem: WorldFactory = (ctx: WorldContext): WorldModule => {
 
   ctx.register({
     id: 'shmem.deck',
-    name: 'Shared memory',
+    name: 'Cache deck',
     role: 'architectural shared-segment illustration · no process mappings',
     kind: 'memory',
     district: 'shmem',
@@ -1409,7 +1409,7 @@ export const createShmem: WorldFactory = (ctx: WorldContext): WorldModule => {
     id: 'shared.buffers',
     // "Buffer pool" is the structure; shared_buffers is the parameter that
     // sizes it. Naming it only by the GUC conflates the two.
-    name: 'Buffer pool (shared_buffers)',
+    name: 'Device DRAM data cache',
     role: 'a representative sample of the page cache every backend reads through',
     kind: 'memory',
     district: 'shmem',

@@ -436,14 +436,14 @@ describe('theme toggle entry point', () => {
       'replica.standby',
     ])
     expect(buttons.map((button) => button.textContent.replace(/^\d+/, ''))).toEqual([
-      'Clients',
-      'Backends',
-      'Buffer pool (shared_buffers)',
-      'WAL',
-      'Storage',
-      'Query lab',
-      'Maintenance',
-      'Standby',
+      'Host clients',
+      'Flow towers (SQ/CQ pairs)',
+      'Device DRAM data cache',
+      'Write path (destage)',
+      'NAND array',
+      'FTL lab',
+      'Garbage collection',
+      'Multi-queue fairness',
     ])
     hud.dispose()
   })

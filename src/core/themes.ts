@@ -54,18 +54,21 @@ export const NIGHT_PALETTE: Record<ColorKey, number> = {
   client: 0x8ecae6,
   backend: 0x5ad1ff,
   shmem: 0x7b6cff,
-  bufClean: 0x3fa7ff,
-  bufDirty: 0xff4d6d,
+  // Device semantic hues. Clean cache lines read as cache-cyan (NAND erase
+  // blocks live on a green die), dirty cache lines are the one hot red-orange
+  // — the destage debt everybody must see.
+  bufClean: 0x35c8e8,
+  bufDirty: 0xff5a2e,
   bufPinned: 0xffd166,
   bufFree: 0x1b2740,
-  wal: 0xffb03a,
+  wal: 0xffa02e, // program/destage amber — the flash write path
   walDim: 0x7a5312,
-  storage: 0x55d6a0,
-  vacuum: 0xb57bff,
-  checkpoint: 0xff7ac6,
+  storage: 0x36e07f, // NAND die green — brighter mint, clear of index aqua
+  vacuum: 0xb57bff, // GC violet
+  checkpoint: 0xf03ae0, // erase-suspend magenta, clear of destage orange and cobalt
   bgwriter: 0x4fe3c1,
-  replication: 0xff9c1c,
-  lock: 0xff605c,
+  replication: 0x3a6ff0, // fairness path — cobalt, clear of destage amber and index aqua
+  lock: 0xe64c8f, // waiters — pulled off the dirty-cache orange
   ok: 0x57e389,
   warn: 0xffcc55,
   crit: 0xff5f6d,
@@ -113,8 +116,8 @@ export const DAY_PALETTE: Record<ColorKey, number> = {
   ground: 0x948d7a, // deep civic paving beneath the pale mineral structures
 
   /* --- the plaza: page state --- */
-  bufClean: 0x1d5fcb, // clean page — deep true blue
-  bufDirty: 0xe02b46, // dirty page — the one red everybody must see
+  bufClean: 0x1d9ecb, // clean cache line — cache-cyan
+  bufDirty: 0xd8401e, // dirty cache line — the one hot orange everybody must see
   bufPinned: 0xefbc16, // pinned — the lightest of the warm ladder
   bufFree: 0xacaeb2, // an unused frame: pale, inert grey
 
@@ -125,21 +128,21 @@ export const DAY_PALETTE: Record<ColorKey, number> = {
   shmem: 0x4b2fd0, // indigo, shared memory
 
   /* --- durability --- */
-  wal: 0xb8720a, // deep amber — pg_wal reads as ochre stone in daylight
+  wal: 0xb8720a, // deep amber — the destage path reads as ochre in daylight
   walDim: 0x8c7444, // a segment that is no longer current
   archive: 0x7d6018, // brass: shipped and cold
-  storage: 0x17954f, // data-directory green
+  storage: 0x3f8f1f, // NAND die green — leafier, clear of index aqua
   index: 0x05a47e, // index aqua, pushed green so bgwriter can have the teal
   toast: 0xc9451f, // oversized values, burnt orange
 
   /* --- maintenance --- */
   vacuum: 0x8b2bc0, // violet
-  checkpoint: 0xc42d92, // magenta-pink
+  checkpoint: 0xc02fb0, // erase-suspend magenta — clear of the dirty-cache orange
   bgwriter: 0x0e8f8c, // teal
-  replication: 0xe2690d, // orange on the wire
+  replication: 0x2f6bc2, // fairness wire — cobalt by day, clear of the dirty-cache orange
 
   /* --- status --- */
-  lock: 0xc62f28, // brick red: a heavyweight lock
+  lock: 0xc23a6b, // waiters — rose, clear of destage orange and GC violet
   ok: 0x3f9c22,
   warn: 0xd18a04,
   crit: 0xb01030,
