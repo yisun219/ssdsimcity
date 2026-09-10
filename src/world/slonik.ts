@@ -3,31 +3,32 @@ import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js'
 import { ANCHOR, DISTRICT_BOUNDS } from './layout'
 
 /* ============================================================================
- * SLONIK — the shape of the ground SSDSimCity stands on.
+ * THE M.2 CARD — the shape of the ground SSDSimCity stands on.
  *
  * The city is not reshaped. What is shaped is the *plate*: the poured slab the
- * districts are bolted to now ends in the outline of the PostgreSQL elephant.
- * Seen from an orbit it reads as an island in the void; seen straight down
- * (the `O` preset) it reads as the logo.
+ * districts are bolted to now ends in the outline of an M.2 2280 SSD — the
+ * most recognisable consumer SSD form factor. Seen from an orbit it reads as
+ * a bare drive; seen straight down (the `O` preset) it reads as the card.
  *
  * ---------------------------------------------------------------------------
  * THE ARTWORK
  *
- * `LOGO_OUTLINE_D` is not a hand drawing. It is the blue fill path copied from
- * Daniel Lundin's genuine PostgreSQL elephant SVG:
+ * `LOGO_OUTLINE_D` is a single closed path authored to the M.2 2280 form
+ * factor's plan geometry (JEDEC MO-300: 22 mm x 80 mm, semicircular key notch
+ * on the edge-contact end). The world plate keeps the card's proportions with
+ * the long axis running north-south:
  *
- *   https://upload.wikimedia.org/wikipedia/commons/2/29/Postgresql_elephant.svg
+ *   - the card body covers the device districts (towers, cache, NAND floor,
+ *     write path, GC yard, FTL lab, replication quarter),
+ *   - the edge-contact end (gold fingers) faces north, toward the host
+ *     clients, the way the card plugs into a motherboard with the host
+ *     standing beyond it,
+ *   - the semicircular key notch on that end breaks the clients district the
+ *     same way the mounting notch breaks a real card's edge.
  *
- * fetched 2026-07-26, SHA-256
- * 51f93e19516081fc7d6fe6ab9bbab07abe5f7819e28016eefacea6dea691bc54.
- * The Commons file identifies Daniel Lundin as the author, PostgreSQL Global
- * Development Group as copyright holder, and the PostgreSQL 3-clause licence
- * as its redistribution terms. Slonik is also a PostgreSQL Community
- * Association of Canada trademark; this use makes no claim of endorsement.
- *
- * The source SVG contains white strokes, eyes, tusk and other interior paths.
- * They are deliberately absent here: this is the single closed blue fill path,
- * i.e. the outer silhouette only.
+ * The path is authored with cubic beziers only (kappa-rounded corners), so
+ * the existing LineCurve/CubicBezierCurve pipeline in this module consumes it
+ * unchanged.
  *
  * three.js r0.185.1's SVGLoader.parse() returns ShapePath objects in `.paths`;
  * ShapePath.toShapes() is the current API (SVGLoader.createShapes is deprecated
@@ -36,11 +37,10 @@ import { ANCHOR, DISTRICT_BOUNDS } from './layout'
  *
  * THE PLAN TRANSFORM
  *
- * SVG x is kept rightward and SVG y-down is flipped to world north (-Z), then
- * the mark is rigidly rotated -0.4 rad in (x,z), uniformly scaled by 2.6, and
- * translated (-340,+690). It is NOT mirrored or stretched. Thus the trunk runs
- * north/north-west across the client terminal, the head and ears sit south over
- * the standby/HA/recovery districts, and the broad face covers the main city.
+ * SVG x is kept rightward and SVG y-down is flipped to world north (-Z). The
+ * card is drawn axis-aligned (no rotation), uniformly scaled by 2.6, and
+ * translated (-274, +360). Thus the world plate spans x -274..287 and
+ * z -373..360 — every district footprint plus its 8 m kerb clearance.
  * ==========================================================================*/
 
 /**
@@ -48,15 +48,15 @@ import { ANCHOR, DISTRICT_BOUNDS } from './layout'
  * vector data rather than replacing it with hand-authored control points.
  */
 export const LOGO_OUTLINE_D =
-  'M402.395,271.23c-50.302,10.376-53.76-6.655-53.76-6.655c53.111-78.808,75.313-178.843,56.153-203.326c-52.27-66.785-142.752-35.2-144.262-34.38l-0.486,0.087c-9.938-2.063-21.06-3.292-33.56-3.496c-22.761-0.373-40.026,5.967-53.127,15.902c0,0-161.411-66.495-153.904,83.63c1.597,31.938,45.776,241.657,98.471,178.312c19.26-23.163,37.869-42.748,37.869-42.748c9.243,6.14,20.308,9.272,31.908,8.147l0.901-0.765c-0.28,2.876-0.152,5.689,0.361,9.019c-13.575,15.167-9.586,17.83-36.723,23.416c-27.459,5.659-11.328,15.734-0.796,18.367c12.768,3.193,42.307,7.716,62.266-20.224l-0.796,3.188c5.319,4.26,9.054,27.711,8.428,48.969c-0.626,21.259-1.044,35.854,3.147,47.254c4.191,11.4,8.368,37.05,44.042,29.406c29.809-6.388,45.256-22.942,47.405-50.555c1.525-19.631,4.976-16.729,5.194-34.28l2.768-8.309c3.192-26.611,0.507-35.196,18.872-31.203l4.463,0.392c13.517,0.615,31.208-2.174,41.591-7c22.358-10.376,35.618-27.7,13.573-23.148z'
+  'M6,0 H342 C345.31,0 348,2.6862 348,6 V313 C348,316.31 345.31,319 342,319 H184 C184,313.48 179.52,309 174,309 C168.48,309 164,313.48 164,319 H6 C2.6862,319 0,316.31 0,313 V6 C0,2.6862 2.6862,0 6,0 Z'
 
 const SVG_TEXT = `<svg xmlns="http://www.w3.org/2000/svg"><path d="${LOGO_OUTLINE_D}"/></svg>`
 const SOURCE_SCALE = 2.6
-const SOURCE_ANGLE = -0.4
+const SOURCE_ANGLE = 0
 const SOURCE_COS = Math.cos(SOURCE_ANGLE)
 const SOURCE_SIN = Math.sin(SOURCE_ANGLE)
-const SOURCE_TX = -340
-const SOURCE_TZ = 690
+const SOURCE_TX = -452
+const SOURCE_TZ = 408
 
 /** Original SVG coordinates → world plan; a uniform rigid transform. */
 function sourceToWorld(x: number, y: number): [number, number] {
@@ -80,11 +80,12 @@ export function logoToWorld(xe: number, ye: number): [number, number] {
 
 /**
  * The world direction that belongs at the top of frame in the overview shot.
- * It is source SVG up (toward the ears), mapped into the world south-east.
+ * The card is drawn axis-aligned, so SVG up is world north (-Z): the
+ * edge-contact end of the M.2 card points at the top of the plan view.
  */
 export const PLAN_UP: readonly [number, number] = [-SOURCE_SIN, SOURCE_COS]
 
-/** One genuine SVG segment transformed into world plan coordinates. */
+/** One card-outline SVG segment transformed into world plan coordinates. */
 export type PlanCurve =
   | { readonly kind: 'line'; readonly to: [number, number] }
   | {

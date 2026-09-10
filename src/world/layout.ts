@@ -228,13 +228,13 @@ export const ANCHOR = {
 
   // the archive estate (east, outside the server): WAL-G's object storage
   /** Where the city hands a finished segment to something it does not own. */
-  archiveGate: [300, 0, -70],
+  archiveGate: [264, 0, -70],
   /** The switchyard. One deck per timeline; a turnout onto a siding is a fork. */
   timelineYard: [344, 0, -44],
   /** The bucket: WAL segment silos, grouped by timeline, plus the .history shelf. */
-  objectStore: [396, 0, -80],
+  objectStore: [360, 0, -80],
   /** WAL-G backup-push objects in the same object-storage estate. */
-  backupVault: [396, 0, 96],
+  backupVault: [360, 0, 96],
 
   // the recovery ground (south-west, a different machine on a different site)
   recoveryGate: [-286, 0, 300],

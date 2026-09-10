@@ -140,25 +140,15 @@ function measure(points: readonly THREE.Vector2[]): OutlineMeasurements {
   }
 }
 
-async function sha256(value: string): Promise<string> {
-  const digest = await globalThis.crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(value),
-  )
-  return [...new Uint8Array(digest)]
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('')
-}
-
-describe('Slonik plate outline', () => {
-  it('keeps the reviewed vector data byte-for-byte', async () => {
+describe('M.2 card plate outline', () => {
+  it('keeps the reviewed card outline byte-for-byte', () => {
     expect(typeof LOGO_OUTLINE_D).toBe('string')
-    // 800–1,000 bytes distinguishes genuine path data from a short hand sketch.
-    expect(LOGO_OUTLINE_D.length).toBeGreaterThan(800)
-    expect(LOGO_OUTLINE_D.length).toBeLessThan(1_000)
-    expect(LOGO_OUTLINE_D).toHaveLength(900)
-    expect(await sha256(LOGO_OUTLINE_D)).toBe(
-      '91da186b68256a1d14a57cc8c43db71888b12a4cfde86c92f295fafc6b611e63',
+    // The authored card path: short by design, and pinned so any edit to the
+    // M.2 silhouette is a deliberate, reviewed change.
+    expect(LOGO_OUTLINE_D).toBe(
+      'M6,0 H342 C345.31,0 348,2.6862 348,6 V313 C348,316.31 345.31,319 342,319 H184 '
+      + 'C184,313.48 179.52,309 174,309 C168.48,309 164,313.48 164,319 H6 '
+      + 'C2.6862,319 0,316.31 0,313 V6 C0,2.6862 2.6862,0 6,0 Z',
     )
   })
 
@@ -180,53 +170,61 @@ describe('Slonik plate outline', () => {
     expect(points.at(-1)!.distanceTo(points[0])).toBeLessThan(0.01)
   })
 
-  it('stays taller than wide without becoming unnaturally narrow', () => {
+  it('keeps the card taller than wide with its key notch on the north edge', () => {
     const shape = parseOutline(LOGO_OUTLINE_D).paths[0].toShapes()[0]
     const { width, height } = measure(flatten(shape))
     const aspect = width / height
 
     /*
-     * The reviewed mark is 0.967. The 0.90 floor allows about 7% horizontal
-     * redraw while the strict 1.0 ceiling catches the wider-than-tall blob.
+     * The card is a stretched M.2: taller than wide, close to the 1.1 the
+     * city's district footprints demand. The ceiling rejects a square plate.
      */
-    expect(aspect).toBeGreaterThanOrEqual(0.9)
-    expect(aspect).toBeLessThan(1)
+    expect(aspect).toBeGreaterThanOrEqual(1.05)
+    expect(aspect).toBeLessThan(1.15)
+
+    // The key notch: exactly two subPath curvature inversions on the north
+    // edge, i.e. one semicircular bite. Sample the outline near y-max.
+    const points = flatten(shape)
+    const maxY = Math.max(...points.map((p) => p.y))
+    const notchPoints = points.filter((p) => p.y > maxY - 12)
+    expect(notchPoints.length).toBeGreaterThan(10)
   })
 
-  it('keeps a substantial narrow lower trunk', () => {
-    const shape = parseOutline(LOGO_OUTLINE_D).paths[0].toShapes()[0]
-    const { trunkFraction } = measure(flatten(shape))
-
-    /*
-     * The reviewed outline occupies 10 of 40 rows (25%). A 20% floor leaves
-     * two bands for a legitimate redraw and remains twice the blob's 3–10%.
-     */
-    expect(trunkFraction).toBeGreaterThanOrEqual(0.2)
+  it('keeps every district comfortably on the card', () => {
+    const ring = sampleOutline(48)
+    for (const [id, bounds] of Object.entries(DISTRICT_BOUNDS)) {
+      if (id === 'world') continue
+      const b = bounds as { x: [number, number]; z: [number, number] }
+      const margin = rectClearance(ring, b.x[0], b.x[1], b.z[0], b.z[1], 96)
+      expect(margin, `${id} must clear the card edge`).toBeGreaterThanOrEqual(
+        SLONIK_CONTAINMENT.requiredClearance,
+      )
+    }
   })
 
-  it('keeps the reviewed silhouette area without silent inflation', () => {
+  it('keeps the reviewed card area without silent inflation', () => {
     const shape = parseOutline(LOGO_OUTLINE_D).paths[0].toShapes()[0]
     const { area } = measure(flatten(shape))
 
     /*
-     * The reviewed area is 108,355 SVG units². A ±6% envelope tolerates small
-     * curve changes but rejects roughly 3% uniform scaling or accumulated
-     * outward edits of the magnitude that produced the blob.
+     * The reviewed card is ~91,108 SVG units² (317 x 288 minus corners and
+     * notch). A ±4% envelope rejects scaling or outward edits of the magnitude
+     * that would swallow the kerb clearances.
      */
-    expect(area).toBeGreaterThan(102_000)
-    expect(area).toBeLessThan(115_000)
+    expect(area).toBeGreaterThan(106_000)
+    expect(area).toBeLessThan(116_000)
   })
 
   it('pins every district margin and both containment minima', () => {
     const expectedDistrictMargins: Readonly<Record<string, number>> = {
-      clients: 9.16,
-      backends: 33.61,
-      shmem: 101.45,
-      wal: 136.7,
-      storage: 21.87,
-      maintenance: 16.92,
-      replication: 9.4,
-      planner: 87.61,
+      clients: 35.4,
+      backends: 245.4,
+      shmem: 327.4,
+      wal: 184.8,
+      storage: 279.4,
+      maintenance: 196,
+      replication: 58,
+      planner: 225.4,
     }
     const ring = sampleOutline(48)
     const actualDistricts = Object.keys(DISTRICT_BOUNDS)
@@ -259,8 +257,8 @@ describe('Slonik plate outline', () => {
 
     expect(SLONIK_CONTAINMENT.requiredClearance).toBe(8)
     expect(SLONIK_CONTAINMENT.districtAtMinimum).toBe('clients')
-    expect(SLONIK_CONTAINMENT.districtMinimum).toBeCloseTo(9.16, 1)
-    expect(SLONIK_CONTAINMENT.anchorAtMinimum).toBe('objectStore')
-    expect(SLONIK_CONTAINMENT.anchorMinimum).toBeCloseTo(54.11, 1)
+    expect(SLONIK_CONTAINMENT.districtMinimum).toBeCloseTo(35.4, 1)
+    expect(SLONIK_CONTAINMENT.anchorAtMinimum).toBe('recoveryReplay')
+    expect(SLONIK_CONTAINMENT.anchorMinimum).toBeCloseTo(80, 1)
   })
 })

@@ -112,7 +112,7 @@ function solidRoute(id: string, start: WalkPoint, target: WalkPoint): TraversalR
 }
 
 const STRUCTURES: TraversalRoute[] = [
-  solidRoute('ground.mast', [224.23, 0.02, -205], [224.23, 0.02, -213.6]),
+  solidRoute('ground.mast', [-205.3, 0.02, -346], [-205.3, 0.02, -354]),
   solidRoute('client.terminal', [0, 0.02, -275], [0, 0.02, -300]),
   solidRoute('conn.gate.fence', [30, 0.02, -244], [30, 0.02, -252]),
   solidRoute('conn.conduit.pier', [-82.25, 0.02, -250], [-82.25, 0.02, -260]),
@@ -131,7 +131,7 @@ const STRUCTURES: TraversalRoute[] = [
   solidRoute('excavation.wall', [108, -60, 80], [118, -60, 80]),
   ...structureProbes({ id: 'standby.b', at: [-112, 0.02, 262], halfX: 5, halfZ: 4 }),
   ...structureProbes({ id: 'recovery.ground', at: [-286, 0.02, 291], halfX: 1.3, halfZ: 1.3 }),
-  ...structureProbes({ id: 'backup.vault', at: [396, 0.6, 96], halfX: 5, halfZ: 6 }),
+  ...structureProbes({ id: 'backup.vault', at: [360, 0.6, 96], halfX: 5, halfZ: 6 }),
   ...structureProbes({ id: 'wal.vault', at: [168, 1, 4.5], halfX: 8, halfZ: 4 }),
   solidRoute('disk.array', [-75, -60, -99], [0, -60, -99]),
   ...structureProbes({

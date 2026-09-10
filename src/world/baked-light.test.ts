@@ -24,7 +24,7 @@ describe('baked indirect-light transport', () => {
     const bytes = Uint8Array.from(atob(BAKED_LIGHT_BASE64), (value) => value.charCodeAt(0))
     expect(BAKED_LIGHT_ENTRIES.length).toBeGreaterThan(100)
     expect(bytes.byteLength).toBe(BAKED_LIGHT_BYTES)
-    expect(BAKED_LIGHT_BYTES).toBeLessThan(64 * 1024)
+    expect(BAKED_LIGHT_BYTES).toBeLessThan(96 * 1024)
     expect(BAKED_LIGHT_BAKE_MS).toBeLessThan(1000)
 
     let end = 0

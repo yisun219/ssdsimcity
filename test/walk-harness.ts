@@ -230,9 +230,11 @@ export async function createWalkCityHarness(options: WalkCityHarnessOptions = {}
     ring: Float64Array
     contains(x: number, z: number): boolean
   }
-  let insetRing = offsetRing(slonik.ring, 14, ringArea2(slonik.ring) > 0)
+  // 30 m in from the kerb: the continuity estate stands along the card's
+  // east edge, so the perimeter walk keeps a clear lane inside it.
+  let insetRing = offsetRing(slonik.ring, 30, ringArea2(slonik.ring) > 0)
   if (!slonik.contains(insetRing[0], insetRing[1])) {
-    insetRing = offsetRing(slonik.ring, -14, ringArea2(slonik.ring) > 0)
+    insetRing = offsetRing(slonik.ring, -30, ringArea2(slonik.ring) > 0)
   }
   const platePerimeter: WalkPoint[] = []
   for (let i = 0; i < insetRing.length; i += 2) {

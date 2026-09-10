@@ -342,8 +342,8 @@ const KERB_W = 4.2
 const HALO_NEAR = 5
 const HALO_FAR = 14
 /** Samples per cubic along the outline. 17 cubics × 16 ≈ 15 m of kerb each. */
-const RIM_SEG = 16
-const RIM_SEG_LOW = 9
+const RIM_SEG = 64
+const RIM_SEG_LOW = 24
 /** Metres encoded across the signed edge field. */
 const EDGE_MAX = 96
 /** Edge-field resolution across the plate's width. */
@@ -791,6 +791,28 @@ export const createGround: WorldFactory = (ctx: WorldContext): WorldModule => {
     clearance: (x: number, z: number) => clearance(ring, x, z),
   }
 
+  /* Edge-contact fingers: a gold pad strip at the card's north end, where an
+   * M.2 card's edge connector would sit. The host clients stand just beyond
+   * it — the card reads as plugging in toward them. */
+  {
+    const fingers = new THREE.InstancedMesh(
+      new THREE.PlaneGeometry(3.2, 30).rotateX(-Math.PI / 2),
+      dampFog(new THREE.MeshBasicMaterial({ color: 0xc9a24a, toneMapped: false })),
+      26,
+    )
+    fingers.name = 'ground.edgeFingers'
+    const _m = new THREE.Matrix4()
+    for (let i = 0; i < 26; i++) {
+      _m.makeTranslation(-77 + i * 6.4, 0.2, -344)
+      fingers.setMatrixAt(i, _m)
+    }
+    fingers.instanceMatrix.needsUpdate = true
+    fingers.raycast = () => {}
+    fingers.userData.pgNoShadow = true
+    group.add(fingers)
+  }
+
+
   /* ---------------------------------------------------------------------
    * 2. The excavation: rim, walls, strata, floor.
    * -------------------------------------------------------------------*/
@@ -1023,6 +1045,9 @@ export const createGround: WorldFactory = (ctx: WorldContext): WorldModule => {
   // the end of RAM: the kernel page cache remains volatile below this cut.
   addDecal('POSTGRESQL ADDRESS SPACE ENDS HERE', COLOR.shmem, 0, 0.08, -CITY.pit.z - 5, 0, 180)
   addDecal('POSTGRESQL ADDRESS SPACE ENDS HERE', COLOR.shmem, 0, 0.08, CITY.pit.z + 5, 0, 180)
+  // Card silkscreen: the drive identifies itself the way a real M.2 does.
+  addDecal('M.2 2280 SSD', 0xd8b25f, 210, 0.09, 330, 0, 150)
+  addDecal('EDGE CONTACTS ▲ HOST', 0xd8b25f, 0, 0.08, -330, 0, 120)
 
   for (const spec of PLINTHS) {
     const b = DISTRICT_BOUNDS[spec.district]
