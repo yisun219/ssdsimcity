@@ -10,6 +10,8 @@ export const BOX_TRIANGLES = 12
 export const BEVELED_BOX_TRIANGLES = 44
 
 interface BoxGeometryPair {
+  /** Stable per-pair identity: survives the plain/beveled quality swap. */
+  id: string
   plain: THREE.BoxGeometry
   beveled: THREE.BufferGeometry
 }
@@ -185,7 +187,9 @@ export function pairBoxGeometries(
       ? INSTANCED_BOX_BEVEL_RATIO
       : BOX_BEVEL_METRES
   const beveled = createBeveledBoxGeometry(width, height, depth, requested)
-  const pair = { plain, beveled }
+  // Identity = the box's dimensions: every pair is minted for one size, and
+  // the same dimensions must bake identically across quality tiers.
+  const pair = { id: `${width}x${height}x${depth}`, plain, beveled }
   ;(plain.userData as BoxGeometryData).pgBoxPair = pair
   ;(beveled.userData as BoxGeometryData).pgBoxPair = pair
   return pair

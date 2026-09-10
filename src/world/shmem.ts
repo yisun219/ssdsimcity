@@ -1138,7 +1138,8 @@ export const createShmem: WorldFactory = (ctx: WorldContext): WorldModule => {
   const bladeGroup = new THREE.Group()
   bladeGroup.name = 'xmin.horizon'
   procGroup.add(bladeGroup)
-  const gBladeDisc = keep(new THREE.CircleGeometry(PROC_R + 3.4, 44).rotateX(-Math.PI / 2))
+  const BLADE_R = PROC_R + 1.9 // keeps the disc edge clear of the legends south of the ring
+  const gBladeDisc = keep(new THREE.CircleGeometry(BLADE_R, 44).rotateX(-Math.PI / 2))
   const mBlade = keep(
     new THREE.MeshBasicMaterial({
       color: COLOR.index,
@@ -1150,8 +1151,11 @@ export const createShmem: WorldFactory = (ctx: WorldContext): WorldModule => {
     }),
   )
   const bladeDisc = new THREE.Mesh(gBladeDisc, mBlade)
+  // Start at the settled height: a boot-time sweep from y=0 would slide the
+  // disc across the deck slab and trip the orbit z-fighting invariant.
+  bladeDisc.position.y = MOUNT_Y + 1.9
   bladeGroup.add(bladeDisc)
-  const gBladeRing = keep(new THREE.TorusGeometry(PROC_R + 3.4, 0.18, 6, 48))
+  const gBladeRing = keep(new THREE.TorusGeometry(BLADE_R, 0.18, 6, 48))
   const mBladeRing = keep(new THREE.MeshBasicMaterial({ color: COLOR.index, toneMapped: false }))
   const bladeRing = new THREE.Mesh(gBladeRing, mBladeRing)
   bladeRing.rotation.x = Math.PI / 2
@@ -1893,7 +1897,7 @@ export const createShmem: WorldFactory = (ctx: WorldContext): WorldModule => {
     const pinnedHard = age > XID_SPAN * 0.55
     // The horizon is a consequence of the xids actually plotted here. It may
     // never advance above the oldest live transaction pillar.
-    const by = MOUNT_Y + Math.max(0.5, bladeH)
+    const by = MOUNT_Y + Math.max(1.9, bladeH)
     bladeDisc.position.y += (by - bladeDisc.position.y) * (1 - Math.exp(-4 * dt))
     bladeRing.position.y = bladeDisc.position.y
     const danger = clamp01(age / (XID_SPAN * 0.8))

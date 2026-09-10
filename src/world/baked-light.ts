@@ -68,6 +68,7 @@ export function mixBoundaryColor(receiver: number, neighbour: number, weight: nu
 
 interface BakedMesh {
   mesh: THREE.Mesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]>
+  key: string
   signature: number
   instanced: boolean
   count: number
@@ -76,6 +77,7 @@ interface BakedMesh {
 export interface BakedLightPayload {
   version: number
   entries: Array<{
+    key: string
     signature: number
     instanced: boolean
     count: number
@@ -138,19 +140,42 @@ function hashSignature(value: string): number {
 }
 
 function meshSignature(
-  mesh: THREE.Mesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]>,
-  ordinal: number,
+  label: string,
+  occurrence: number,
+  shape: string,
   count: number,
 ): number {
-  const positions = mesh.geometry.getAttribute('position')?.count ?? 0
-  return hashSignature(
-    `${ordinal}:${mesh.name || '_'}:${mesh.geometry.type}:${count}:${positions}`,
-  )
+  // The signature hashes exactly the key inputs — the same label/address the
+  // install matcher looks up — so a key hit always implies a signature hit.
+  return hashSignature(`${label}#${occurrence}:${shape}:${count}`)
+}
+
+/** Shape identity of the bake-receiver geometry: quality-tier invariant. */
+function geometryShape(mesh: THREE.Mesh<THREE.BufferGeometry>): string {
+  // The position count is bevel-tier dependent (applyBoxBevelDetail swaps the
+  // shared BoxGeometry for its beveled twin), which made the bake signature
+  // flap with the adaptive-quality tier. The pair identity is what is stable:
+  // both geometries of a pair carry the same marker.
+  const pair = (mesh.geometry.userData as { pgBoxPair?: { id?: string } }).pgBoxPair
+  return pair
+    ? `pair:${pair.id ?? 'box'}`
+    : `${mesh.geometry.type}:${mesh.geometry.getAttribute('position')?.count ?? 0}`
+}
+
+/** First two named ancestors, most specific last — a stable per-mesh address. */
+function parentName(mesh: THREE.Mesh): string {
+  const chain: string[] = []
+  let node: THREE.Object3D | null = mesh.parent
+  while (node && chain.length < 2) {
+    if (node.name) chain.unshift(node.name)
+    node = node.parent
+  }
+  return chain.join('/') || '_'
 }
 
 function bakedMeshes(root: THREE.Object3D): BakedMesh[] {
   const out: BakedMesh[] = []
-  let ordinal = 0
+  const seen = new Map<string, number>()
   root.traverse((object) => {
     const mesh = object as THREE.Mesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]>
     if (mesh.isMesh !== true) return
@@ -159,9 +184,19 @@ function bakedMeshes(root: THREE.Object3D): BakedMesh[] {
     const count = instanced
       ? (mesh as THREE.InstancedMesh).instanceMatrix.count
       : mesh.geometry.getAttribute('position')?.count ?? 0
+    // Key on the mesh's own name; unnamed geometry (merged batches) falls back
+    // to its immediate parent's name, then geometry type. One level only —
+    // deeper chains drift when boot-time grouping races nest a district one
+    // level deeper on one page than another. Occurrence indexes duplicates of
+    // the same label in traverse order, stable per boot.
+    const label = mesh.name || mesh.parent?.name || mesh.geometry.type
+    const occurrence = seen.get(label) ?? 0
+    seen.set(label, occurrence + 1)
+    const key = `${label}#${occurrence}`
     out.push({
       mesh,
-      signature: meshSignature(mesh, ordinal++, count),
+      key,
+      signature: meshSignature(label, occurrence, geometryShape(mesh), count),
       instanced,
       count,
     })
@@ -252,25 +287,16 @@ export function installBakedIndirect(root: THREE.Object3D): BakedLightInstallSta
   }
 
   const meshes = bakedMeshes(root)
-  if (meshes.length !== BAKED_LIGHT_ENTRIES.length) {
-    return {
-      installed: false,
-      meshes: 0,
-      instances: 0,
-      vertices: 0,
-      byteLength: BAKED_LIGHT_BYTES,
-      geometryBytes: 0,
-      memoryBytes: 0,
-      bakeMs: BAKED_LIGHT_BAKE_MS,
-      elapsedMs: performance.now() - started,
-      reason: `scene has ${meshes.length} bake meshes; payload has ${BAKED_LIGHT_ENTRIES.length}`,
-    }
-  }
-
-  for (let i = 0; i < meshes.length; i++) {
-    const expected = BAKED_LIGHT_ENTRIES[i]
-    const actual = meshes[i]
+  // Match by stable per-mesh key (named path + same-name occurrence), not by
+  // traverse ordinal: boot-time races can add or reorder meshes without
+  // changing the ones that were baked. Every baked key must exist with the
+  // same geometry; extra unbaked meshes on the page are simply left alone.
+  const byKey = new Map<string, typeof meshes[number]>()
+  for (const actual of meshes) byKey.set(actual.key, actual)
+  for (const expected of BAKED_LIGHT_ENTRIES) {
+    const actual = byKey.get(expected.key)
     if (
+      !actual ||
       expected.signature !== actual.signature ||
       expected.instanced !== actual.instanced ||
       expected.count !== actual.count
@@ -285,7 +311,7 @@ export function installBakedIndirect(root: THREE.Object3D): BakedLightInstallSta
         memoryBytes: 0,
         bakeMs: BAKED_LIGHT_BAKE_MS,
         elapsedMs: performance.now() - started,
-        reason: `mesh ${i} does not match ${expected.signature}`,
+        reason: `mesh ${expected.key} does not match`,
       }
     }
   }
@@ -314,9 +340,10 @@ export function installBakedIndirect(root: THREE.Object3D): BakedLightInstallSta
     const geometry = meshes[i].mesh.geometry
     geometryUse.set(geometry, (geometryUse.get(geometry) ?? 0) + 1)
   }
-  for (let i = 0; i < meshes.length; i++) {
-    const record = meshes[i]
-    const entry = BAKED_LIGHT_ENTRIES[i]
+  const entryByKey = new Map(BAKED_LIGHT_ENTRIES.map((entry) => [entry.key, entry]))
+  for (const record of meshes) {
+    const entry = entryByKey.get(record.key)
+    if (!entry) continue
     const mustClone = (geometryUse.get(record.mesh.geometry) ?? 0) > 1
       || Boolean(record.mesh.geometry.userData.pgBoxPair)
     const geometry = geometryForBake(record, mustClone)
@@ -352,7 +379,10 @@ export function installBakedIndirect(root: THREE.Object3D): BakedLightInstallSta
 
   return {
     installed: true,
-    meshes: meshes.length,
+    // Report matched receivers, not raw scene meshes: a boot-time race can add
+    // a late mesh that the payload never covered, and the tests assert
+    // receivers === installed meshes.
+    meshes: BAKED_LIGHT_ENTRIES.length,
     instances,
     vertices,
     byteLength: bytes.byteLength,
@@ -645,6 +675,7 @@ export function bakeSceneIndirect(root: THREE.Object3D): BakedLightPayload {
       record.count * (record.instanced ? INSTANCE_STRIDE : VERTEX_STRIDE),
     )
     entries.push({
+      key: record.key,
       signature: record.signature,
       instanced: record.instanced,
       count: record.count,
