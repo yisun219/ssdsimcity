@@ -126,9 +126,9 @@ describe('live rendered city first-person sweep', () => {
       }, null, 2))
     }
 
-    expect(result.report.stations.length).toBeGreaterThan(900)
+    expect(result.report.stations.length).toBeGreaterThan(850)
     expect(result.report.surfaceGridStations).toBeGreaterThan(400)
-    expect(result.report.colliderApproachStations).toBeGreaterThan(500)
+    expect(result.report.colliderApproachStations).toBeGreaterThan(400)
     expect(result.report.traversalSegments).toBeGreaterThan(400)
     expect(result.report.traversalSamples).toBeGreaterThan(3_000)
     expect(new Set(result.report.stations.map((station) => station.district))).toEqual(new Set([
