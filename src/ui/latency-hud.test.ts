@@ -124,7 +124,7 @@ describe('latency HUD', () => {
     const hud = createHud(context(), { onInvestigate: investigate })
     const button = document.querySelector<HTMLButtonElement>('.hud-investigate')!
     expect(button).not.toBeNull()
-    expect(button.getAttribute('aria-label')).toBe('Investigate a PostgreSQL incident')
+    expect(button.getAttribute('aria-label')).toBe('Investigate a device incident')
     button.click()
     expect(investigate).toHaveBeenCalledOnce()
     hud.dispose()

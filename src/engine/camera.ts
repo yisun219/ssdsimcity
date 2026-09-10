@@ -109,11 +109,12 @@ const FOCUS_UP_BIAS = 0.436 // 25°
 /** Fraction of a tour path spent easing in / out. */
 const PATH_EASE = 0.18
 
-/* A raised three-quarter view keeps the client terminal in the foreground,
- * the backend row clear of the basin, and storage visible below the deck.
- * The complete Slonik silhouette belongs to the separate plan preset. */
-const HOME_POS = new THREE.Vector3(-235, 275, -345)
-const HOME_PIVOT = new THREE.Vector3(-5, -6, -45)
+/* The home shot reads as a product photo of the drive: low enough that the
+ * M.2 card outline, its gold edge contacts, and the silkscreen are the first
+ * things the eye finds, high enough that the die floor below the deck stays
+ * visible. The straight-down card plan belongs to the separate plan preset. */
+const HOME_POS = new THREE.Vector3(-285, 175, -385)
+const HOME_PIVOT = new THREE.Vector3(-5, -8, -40)
 
 /**
  * THE OVERVIEW SHOT — straight down on the plate.

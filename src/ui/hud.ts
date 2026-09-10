@@ -385,9 +385,14 @@ export function createHud(ctx: UiContext, options: { onInvestigate?: () => void 
   const clockEl = el('span', { class: 'hud-clock', text: '0:00' })
   const brand = el(
     'div',
-    { class: 'hud-brand', title: 'SSDSimCity — a working model of the PostgreSQL engine' },
+    { class: 'hud-brand', title: 'SSDSimCity — inside an M.2 2280 SSD' },
     statusDot,
-    el('span', { class: 'hud-brand__mark' }, el('b', { text: 'PG' }), 'SSDSimCity'.slice(2)),
+    el('span', { class: 'hud-brand__mark' }, el('b', { text: 'SS' }), 'DSimCity'),
+    el(
+      'span',
+      { class: 'hud-formfactor', title: 'The city plate is an M.2 2280 card — 22 mm x 80 mm, scaled' },
+      'M.2 2280',
+    ),
     el('span', { class: 'hud-brand__rule' }),
     clockEl,
   )
@@ -518,7 +523,7 @@ export function createHud(ctx: UiContext, options: { onInvestigate?: () => void 
       class: 'pg-btn hud-tool hud-investigate',
       type: 'button',
       title: 'Investigate a growing table, collect evidence, and verify recovery',
-      'aria-label': 'Investigate a PostgreSQL incident',
+      'aria-label': 'Investigate a device incident',
       on: { click: options.onInvestigate },
     },
     icon('diagnose', 15),
@@ -529,7 +534,7 @@ export function createHud(ctx: UiContext, options: { onInvestigate?: () => void 
     {
       class: 'pg-btn hud-tool hud-trace-open',
       type: 'button',
-      title: 'Trace one fixed query through PostgreSQL  (Enter)',
+      title: 'Trace one fixed I/O through the device  (Enter)',
       'aria-label': 'Run a query',
       on: { click: () => bus.emit('trace:open', { source: 'button' }) },
     },

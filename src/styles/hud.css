@@ -103,6 +103,17 @@
   flex: 0 0 auto;
 }
 
+.hud-formfactor {
+  font-family: var(--f-mono);
+  font-size: var(--fs-xs);
+  color: var(--ink-faint);
+  white-space: nowrap;
+  padding: 1px 7px;
+  border: 1px solid var(--line-hair);
+  border-radius: 3px;
+  flex: 0 0 auto;
+}
+
 .hud-clock {
   font-family: var(--f-mono);
   font-size: var(--fs-xs);
